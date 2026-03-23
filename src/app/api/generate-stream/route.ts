@@ -77,7 +77,9 @@ Return ONLY the JSON array, no other text.`;
 
 export async function POST(request: Request) {
   try {
-    const body: GenerationRequest = await request.json();
+    const rawBody = await request.json();
+    const existingCampaignId = rawBody.existing_campaign_id;
+    const body: GenerationRequest = rawBody;
 
     // Build brand voice context
     let brandVoiceContext = "";
@@ -116,27 +118,33 @@ export async function POST(request: Request) {
       }
     }
 
-    // Create campaign first
-    const { data: campaign, error: campError } = await supabase
-      .from("campaigns")
-      .insert({
-        name: body.campaign_name,
-        description: body.description || null,
-        brand_voice_id: body.brand_voice_id || null,
-        company_id: body.company_id || null,
-        folder_id: body.folder_id || null,
-        imported_url: body.imported_url || null,
-        goal: body.goal,
-        audience: body.audience,
-        num_messages: body.num_messages,
-        channels: body.channels,
-        status: "draft",
-        variable_set_id: body.variable_set_id || null,
-      })
-      .select()
-      .single();
+    // Use existing campaign (regenerate) or create new one
+    let campaign: { id: string };
+    if (existingCampaignId) {
+      campaign = { id: existingCampaignId };
+    } else {
+      const { data: newCampaign, error: campError } = await supabase
+        .from("campaigns")
+        .insert({
+          name: body.campaign_name,
+          description: body.description || null,
+          brand_voice_id: body.brand_voice_id || null,
+          company_id: body.company_id || null,
+          folder_id: body.folder_id || null,
+          imported_url: body.imported_url || null,
+          goal: body.goal,
+          audience: body.audience,
+          num_messages: body.num_messages,
+          channels: body.channels,
+          status: "draft",
+          variable_set_id: body.variable_set_id || null,
+        })
+        .select()
+        .single();
 
-    if (campError) throw campError;
+      if (campError) throw campError;
+      campaign = newCampaign!;
+    }
 
     // Stream via SSE - generate per channel
     const encoder = new TextEncoder();

@@ -24,6 +24,13 @@ export async function POST(request: Request) {
   try {
     const { campaign_id, start_date } = await request.json();
 
+    // Load the campaign to get company_id for cross-campaign conflict check
+    const { data: campaign } = await supabase
+      .from("campaigns")
+      .select("id, company_id")
+      .eq("id", campaign_id)
+      .single();
+
     // Load unscheduled messages for this campaign
     const { data: messages } = await supabase
       .from("campaign_messages")
@@ -37,7 +44,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "No unscheduled messages found" });
     }
 
-    // Load already-scheduled messages to avoid conflicts
+    // Load already-scheduled messages for THIS campaign
     const { data: scheduled } = await supabase
       .from("campaign_messages")
       .select("send_at, channel")
@@ -48,6 +55,37 @@ export async function POST(request: Request) {
       date: new Date(s.send_at!),
       channel: s.channel,
     }));
+
+    // Load ALL scheduled messages for the same company across ALL campaigns
+    // This prevents posting on the same platform at the same time for the same company
+    let companyScheduled: { date: Date; channel: string }[] = [];
+    if (campaign?.company_id) {
+      // Get all campaign IDs for this company
+      const { data: companyCampaigns } = await supabase
+        .from("campaigns")
+        .select("id")
+        .eq("company_id", campaign.company_id);
+
+      const campaignIds = (companyCampaigns || []).map((c) => c.id);
+
+      if (campaignIds.length > 0) {
+        const { data: companyMsgs } = await supabase
+          .from("campaign_messages")
+          .select("send_at, channel, campaign_id")
+          .in("campaign_id", campaignIds)
+          .not("send_at", "is", null);
+
+        companyScheduled = (companyMsgs || [])
+          .filter((m) => m.campaign_id !== campaign_id) // exclude current campaign (already in existingDates)
+          .map((s) => ({
+            date: new Date(s.send_at!),
+            channel: s.channel,
+          }));
+      }
+    }
+
+    // Combine all existing scheduled dates for conflict checking
+    const allExisting = [...existingDates, ...companyScheduled];
 
     // Group unscheduled messages by channel
     const byChannel: Record<string, typeof messages> = {};
@@ -69,8 +107,8 @@ export async function POST(request: Request) {
       const gapDays = MIN_GAP_DAYS[channel] || 2;
       let timeIndex = 0;
 
-      // Find the latest existing scheduled date for this channel
-      const channelExisting = existingDates
+      // Find the latest existing scheduled date for this channel (including cross-campaign)
+      const channelExisting = allExisting
         .filter((e) => e.channel === channel)
         .sort((a, b) => b.date.getTime() - a.date.getTime());
 
@@ -88,15 +126,46 @@ export async function POST(request: Request) {
         const scheduledDate = new Date(cursor);
         scheduledDate.setHours(hour, 0, 0, 0);
 
-        // Ensure we're not scheduling on the same day as another message of the same channel
+        // Check for conflicts: same channel + same day + same hour across ALL campaigns for this company
         let conflicts = true;
-        while (conflicts) {
+        let safetyCounter = 0;
+        while (conflicts && safetyCounter < 365) {
+          safetyCounter++;
           const dateStr = scheduledDate.toISOString().split("T")[0];
-          const hasConflict = [...existingDates, ...updates.map((u) => ({ date: new Date(u.send_at), channel }))].some(
-            (e) => e.channel === channel && e.date.toISOString().split("T")[0] === dateStr
-          );
+          const scheduledHour = scheduledDate.getHours();
+
+          // Check against all existing (this campaign + cross-campaign)
+          const hasConflict = [
+            ...allExisting,
+            ...updates.map((u) => ({ date: new Date(u.send_at), channel })),
+          ].some((e) => {
+            const eDate = e.date.toISOString().split("T")[0];
+            const eHour = e.date.getHours();
+            // Same channel + same day = conflict (don't double-post same channel same day)
+            if (e.channel === channel && eDate === dateStr) return true;
+            // Same day + same hour on ANY channel = conflict (don't flood at same time)
+            if (eDate === dateStr && eHour === scheduledHour) return true;
+            return false;
+          });
+
           if (hasConflict) {
+            // Try next best time slot on same day first
+            const nextTimeIdx = bestTimes.indexOf(scheduledHour) + 1;
+            if (nextTimeIdx > 0 && nextTimeIdx < bestTimes.length) {
+              const triedTimes = new Set(
+                [...allExisting, ...updates.map((u) => ({ date: new Date(u.send_at), channel }))]
+                  .filter((e) => e.date.toISOString().split("T")[0] === dateStr)
+                  .map((e) => e.date.getHours())
+              );
+              const availableTime = bestTimes.find((t) => !triedTimes.has(t) && t > scheduledHour);
+              if (availableTime !== undefined) {
+                scheduledDate.setHours(availableTime, 0, 0, 0);
+                continue;
+              }
+            }
+            // Move to next day and reset to first best time
             scheduledDate.setDate(scheduledDate.getDate() + 1);
+            scheduledDate.setHours(bestTimes[0], 0, 0, 0);
           } else {
             conflicts = false;
           }

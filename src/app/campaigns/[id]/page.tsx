@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import type { Campaign, CampaignMessage, CampaignFile } from "@/lib/types";
+import type { Campaign, CampaignMessage, CampaignFile, BrandVoice, Company } from "@/lib/types";
 
 const REVISE_PRESETS = [
   { label: "More Urgent", prompt: "Make this more urgent with stronger calls to action" },
@@ -14,6 +14,30 @@ const REVISE_PRESETS = [
   { label: "More Persuasive", prompt: "Add more persuasion triggers: social proof, urgency, scarcity, authority" },
   { label: "Story-based", prompt: "Rewrite this using storytelling — open with a hook, build tension, resolve with CTA" },
   { label: "Add Emoji", prompt: "Add tasteful emojis to make this more engaging and scannable" },
+];
+
+const TIMEZONES = [
+  { value: "America/New_York", label: "Eastern (ET)" },
+  { value: "America/Chicago", label: "Central (CT)" },
+  { value: "America/Denver", label: "Mountain (MT)" },
+  { value: "America/Los_Angeles", label: "Pacific (PT)" },
+  { value: "America/Anchorage", label: "Alaska (AKT)" },
+  { value: "Pacific/Honolulu", label: "Hawaii (HT)" },
+  { value: "Europe/London", label: "London (GMT/BST)" },
+  { value: "Europe/Paris", label: "Central Europe (CET)" },
+  { value: "Asia/Tokyo", label: "Japan (JST)" },
+  { value: "Asia/Dubai", label: "Dubai (GST)" },
+  { value: "Australia/Sydney", label: "Sydney (AEST)" },
+  { value: "UTC", label: "UTC" },
+];
+
+const EMAIL_STYLE_PRESETS = [
+  { label: "Modern Minimal", value: "Clean minimal design with lots of whitespace, single accent color, sans-serif typography, subtle borders, no heavy backgrounds" },
+  { label: "Bold & Vibrant", value: "Bold colors, gradient accents, large hero section, strong visual hierarchy, eye-catching CTA buttons with shadows" },
+  { label: "Corporate Professional", value: "Conservative professional layout, navy/gray palette, structured sections, formal typography, logo-prominent header" },
+  { label: "Warm & Friendly", value: "Rounded corners, warm color palette, soft shadows, conversational layout, friendly illustrations style, approachable feel" },
+  { label: "Dark & Premium", value: "Dark background (#1a1a2e), light text, gold/purple accents, premium luxury feel, sleek typography, high contrast CTA" },
+  { label: "Newsletter Style", value: "Multi-section editorial layout, clear section dividers, sidebar elements, featured content blocks, magazine-like structure" },
 ];
 
 export default function CampaignDetail() {
@@ -52,6 +76,25 @@ export default function CampaignDetail() {
   const [htmlPreviews, setHtmlPreviews] = useState<Record<string, string>>({});
   const [showHtmlPreview, setShowHtmlPreview] = useState<string | null>(null);
 
+  // Edit campaign details state
+  const [showEditCampaign, setShowEditCampaign] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editGoal, setEditGoal] = useState("");
+  const [editAudience, setEditAudience] = useState("");
+  const [editBrandVoiceId, setEditBrandVoiceId] = useState<string | null>(null);
+  const [editCompanyId, setEditCompanyId] = useState<string | null>(null);
+  const [editTimezone, setEditTimezone] = useState("America/New_York");
+  const [editEmailStyle, setEditEmailStyle] = useState("");
+  const [editEmailStyleCustom, setEditEmailStyleCustom] = useState("");
+  const [brandVoices, setBrandVoices] = useState<BrandVoice[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [savingCampaign, setSavingCampaign] = useState(false);
+
+  // Regenerate state
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenProgress, setRegenProgress] = useState("");
+
   const loadCampaign = useCallback(async () => {
     const [campRes, msgsRes, filesRes] = await Promise.all([
       supabase
@@ -81,6 +124,32 @@ export default function CampaignDetail() {
   useEffect(() => {
     loadCampaign();
   }, [loadCampaign]);
+
+  // Format time in campaign timezone
+  function formatInTz(dateStr: string) {
+    const tz = campaign?.timezone || "America/New_York";
+    const d = new Date(dateStr);
+    return d.toLocaleString("en-US", {
+      timeZone: tz,
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    });
+  }
+
+  function formatTimeOnlyTz(dateStr: string) {
+    const tz = campaign?.timezone || "America/New_York";
+    const d = new Date(dateStr);
+    return d.toLocaleString("en-US", {
+      timeZone: tz,
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    });
+  }
 
   async function updateMessage(id: string, updates: Partial<CampaignMessage>) {
     await supabase.from("campaign_messages").update(updates).eq("id", id);
@@ -187,6 +256,7 @@ export default function CampaignDetail() {
     if (msg.subject) text += `Subject: ${msg.subject}\n\n`;
     text += msg.body;
     if (msg.cta_text) text += `\n\n${msg.cta_text}`;
+    if (msg.cta_url) text += `\n${msg.cta_url}`;
     await navigator.clipboard.writeText(text);
     setCopied(msg.id);
     setTimeout(() => setCopied(null), 2000);
@@ -303,6 +373,9 @@ export default function CampaignDetail() {
         if (vs?.platform) platform = vs.platform;
       }
 
+      // Get email style — campaign-level or default
+      const emailStyle = campaign?.email_style || "";
+
       const res = await fetch("/api/generate-html", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -310,9 +383,11 @@ export default function CampaignDetail() {
           subject: msg.subject,
           body: msg.body,
           cta_text: msg.cta_text,
+          cta_url: msg.cta_url,
           preview_text: msg.preview_text,
           brand_color: "#7c3aed",
           platform,
+          email_style: emailStyle,
         }),
       });
 
@@ -324,6 +399,138 @@ export default function CampaignDetail() {
       console.error("HTML gen error:", err);
     }
     setGeneratingHtml(null);
+  }
+
+  // ── Edit Campaign Details ──
+  async function openEditCampaign() {
+    if (!campaign) return;
+    // Load brand voices and companies for dropdowns
+    const [bvRes, coRes] = await Promise.all([
+      supabase.from("brand_voices").select("id, name, company_id").order("name"),
+      supabase.from("companies").select("id, name").order("name"),
+    ]);
+    setBrandVoices(bvRes.data as BrandVoice[] || []);
+    setCompanies(coRes.data as Company[] || []);
+
+    setEditName(campaign.name);
+    setEditDescription(campaign.description || "");
+    setEditGoal(campaign.goal || "");
+    setEditAudience(campaign.audience || "");
+    setEditBrandVoiceId(campaign.brand_voice_id);
+    setEditCompanyId(campaign.company_id);
+    setEditTimezone(campaign.timezone || "America/New_York");
+
+    // Parse email style
+    const style = campaign.email_style || "";
+    const isPreset = EMAIL_STYLE_PRESETS.some((p) => p.value === style);
+    if (isPreset) {
+      setEditEmailStyle(style);
+      setEditEmailStyleCustom("");
+    } else {
+      setEditEmailStyle("custom");
+      setEditEmailStyleCustom(style);
+    }
+
+    setShowEditCampaign(true);
+  }
+
+  async function saveCampaignDetails() {
+    if (!campaign) return;
+    setSavingCampaign(true);
+
+    const emailStyleValue = editEmailStyle === "custom" ? editEmailStyleCustom : editEmailStyle;
+
+    const updates = {
+      name: editName,
+      description: editDescription || null,
+      goal: editGoal || null,
+      audience: editAudience || null,
+      brand_voice_id: editBrandVoiceId,
+      company_id: editCompanyId,
+      timezone: editTimezone,
+      email_style: emailStyleValue || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    await supabase.from("campaigns").update(updates).eq("id", campaign.id);
+    setCampaign((prev) => prev ? { ...prev, ...updates } : null);
+    setShowEditCampaign(false);
+    setSavingCampaign(false);
+    // Reload to get fresh relations
+    loadCampaign();
+  }
+
+  // ── Regenerate All Content ──
+  async function handleRegenerate() {
+    if (!campaign) return;
+    if (!confirm("This will delete all current messages and regenerate them. Continue?")) return;
+    setRegenerating(true);
+    setRegenProgress("Deleting existing messages...");
+
+    try {
+      // Delete existing messages
+      await supabase.from("campaign_messages").delete().eq("campaign_id", campaign.id);
+      setMessages([]);
+      setHtmlPreviews({});
+
+      setRegenProgress("Generating new content...");
+
+      // Use the streaming endpoint
+      const res = await fetch("/api/generate-stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          campaign_name: campaign.name,
+          description: campaign.description || "",
+          goal: campaign.goal || "",
+          audience: campaign.audience || "",
+          brand_voice_id: campaign.brand_voice_id || undefined,
+          channels: campaign.channels,
+          num_messages: campaign.num_messages,
+          company_id: campaign.company_id || undefined,
+          variable_set_id: campaign.variable_set_id || undefined,
+          imported_url: campaign.imported_url || undefined,
+          existing_campaign_id: campaign.id,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Regeneration failed");
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const raw = line.slice(6);
+            if (raw === "[DONE]") continue;
+            try {
+              const evt = JSON.parse(raw);
+              if (evt.type === "progress") {
+                setRegenProgress(`Generating ${evt.channel}...`);
+              } else if (evt.type === "message") {
+                setMessages((prev) => [...prev, evt.message]);
+              }
+            } catch { /* skip */ }
+          }
+        }
+      }
+
+      setRegenProgress("");
+    } catch (err) {
+      console.error("Regenerate error:", err);
+      setRegenProgress("Error regenerating. Try again.");
+    }
+    setRegenerating(false);
   }
 
   // ── Duplicate Campaign ──
@@ -339,7 +546,7 @@ export default function CampaignDetail() {
         folder_id: campaign.folder_id, goal: campaign.goal, audience: campaign.audience,
         num_messages: campaign.num_messages, channels: dupChannels, status: "draft",
         variable_set_id: campaign.variable_set_id, duplicated_from_id: campaign.id,
-        imported_url: campaign.imported_url,
+        imported_url: campaign.imported_url, timezone: campaign.timezone, email_style: campaign.email_style,
       })
       .select().single();
 
@@ -348,7 +555,7 @@ export default function CampaignDetail() {
       if (msgsToCopy.length > 0) {
         const newMsgs = msgsToCopy.map((m) => ({
           campaign_id: newCamp.id, sequence_order: m.sequence_order, channel: m.channel,
-          subject: m.subject, body: m.body, preview_text: m.preview_text, cta_text: m.cta_text, status: "draft",
+          subject: m.subject, body: m.body, preview_text: m.preview_text, cta_text: m.cta_text, cta_url: m.cta_url, status: "draft",
         }));
         await supabase.from("campaign_messages").insert(newMsgs);
       }
@@ -392,6 +599,8 @@ export default function CampaignDetail() {
     return "text-red-400";
   }
 
+  const tzLabel = TIMEZONES.find((t) => t.value === campaign.timezone)?.label || campaign.timezone || "ET";
+
   return (
     <div>
       {/* Header */}
@@ -400,6 +609,7 @@ export default function CampaignDetail() {
           <div className="flex items-center gap-3 mb-2">
             <h1 className="text-3xl font-bold">{campaign.name}</h1>
             <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${statusColors[campaign.status]}`}>{campaign.status}</span>
+            <span className="text-xs px-2 py-0.5 rounded bg-white/5 text-[var(--muted)]">{tzLabel}</span>
           </div>
           {campaign.description && <p className="text-[var(--muted)] mb-3">{campaign.description}</p>}
           <div className="flex flex-wrap gap-4 text-xs text-[var(--muted)]">
@@ -408,12 +618,20 @@ export default function CampaignDetail() {
             <span>Goal: {campaign.goal}</span>
             <span>Audience: {campaign.audience}</span>
             <span>{messages.length} total messages</span>
+            {campaign.email_style && <span>Email Style: {EMAIL_STYLE_PRESETS.find((p) => p.value === campaign.email_style)?.label || "Custom"}</span>}
             {campaign.imported_url && (
               <a href={campaign.imported_url} target="_blank" rel="noopener noreferrer" className="text-[var(--accent)] hover:underline">Source URL</a>
             )}
           </div>
         </div>
         <div className="flex gap-2 flex-wrap justify-end">
+          <button onClick={openEditCampaign} className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm transition-colors">
+            Edit Details
+          </button>
+          <button onClick={handleRegenerate} disabled={regenerating}
+            className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+            {regenerating ? regenProgress || "Regenerating..." : "Regenerate"}
+          </button>
           <button onClick={() => setShowAddContent(true)} className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
             + Add Content
           </button>
@@ -434,6 +652,116 @@ export default function CampaignDetail() {
           <a href="/" className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm transition-colors">Back</a>
         </div>
       </div>
+
+      {/* ═══════ EDIT CAMPAIGN MODAL ═══════ */}
+      {showEditCampaign && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 overflow-y-auto py-8">
+          <div className="bg-[var(--card)] border border-[var(--card-border)] rounded-xl p-6 max-w-2xl w-full mx-4">
+            <h3 className="text-lg font-bold mb-4">Edit Campaign Details</h3>
+
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+              <div>
+                <label className="block text-xs text-[var(--muted)] mb-1.5">Campaign Name</label>
+                <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
+                  className="w-full bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)]" />
+              </div>
+
+              <div>
+                <label className="block text-xs text-[var(--muted)] mb-1.5">Description</label>
+                <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={2}
+                  className="w-full bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] resize-none" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-[var(--muted)] mb-1.5">Goal</label>
+                  <input type="text" value={editGoal} onChange={(e) => setEditGoal(e.target.value)}
+                    className="w-full bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)]" />
+                </div>
+                <div>
+                  <label className="block text-xs text-[var(--muted)] mb-1.5">Target Audience</label>
+                  <input type="text" value={editAudience} onChange={(e) => setEditAudience(e.target.value)}
+                    className="w-full bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)]" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-[var(--muted)] mb-1.5">Brand Voice</label>
+                  <select value={editBrandVoiceId || ""} onChange={(e) => setEditBrandVoiceId(e.target.value || null)}
+                    className="w-full bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)]">
+                    <option value="">None</option>
+                    {brandVoices.map((bv) => (
+                      <option key={bv.id} value={bv.id}>{bv.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-[var(--muted)] mb-1.5">Company</label>
+                  <select value={editCompanyId || ""} onChange={(e) => setEditCompanyId(e.target.value || null)}
+                    className="w-full bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)]">
+                    <option value="">None</option>
+                    {companies.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Timezone */}
+              <div>
+                <label className="block text-xs text-[var(--muted)] mb-1.5">Timezone</label>
+                <select value={editTimezone} onChange={(e) => setEditTimezone(e.target.value)}
+                  className="w-full bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)]">
+                  {TIMEZONES.map((tz) => (
+                    <option key={tz.value} value={tz.value}>{tz.label} ({tz.value})</option>
+                  ))}
+                </select>
+                <p className="text-xs text-[var(--muted)] mt-1">All scheduled times will display in this timezone</p>
+              </div>
+
+              {/* Email Style */}
+              <div>
+                <label className="block text-xs text-[var(--muted)] mb-1.5">HTML Email Template Style</label>
+                <p className="text-xs text-[var(--muted)] mb-2">This style will be applied consistently to every HTML email template generated in this campaign.</p>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  {EMAIL_STYLE_PRESETS.map((preset) => (
+                    <button key={preset.label} onClick={() => { setEditEmailStyle(preset.value); setEditEmailStyleCustom(""); }}
+                      className={`text-left text-xs px-3 py-2.5 rounded-lg border transition-colors ${
+                        editEmailStyle === preset.value
+                          ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]"
+                          : "border-[var(--card-border)] hover:border-[var(--muted)]"
+                      }`}>
+                      <span className="font-medium">{preset.label}</span>
+                    </button>
+                  ))}
+                  <button onClick={() => setEditEmailStyle("custom")}
+                    className={`text-left text-xs px-3 py-2.5 rounded-lg border transition-colors ${
+                      editEmailStyle === "custom"
+                        ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]"
+                        : "border-[var(--card-border)] hover:border-[var(--muted)]"
+                    }`}>
+                    <span className="font-medium">Custom Style</span>
+                  </button>
+                </div>
+                {editEmailStyle === "custom" && (
+                  <textarea value={editEmailStyleCustom} onChange={(e) => setEditEmailStyleCustom(e.target.value)} rows={3}
+                    placeholder="Describe your email design style... e.g. Minimalist black and white with green accents, large hero images, rounded buttons..."
+                    className="w-full bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] resize-none" />
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6 pt-4 border-t border-[var(--card-border)]">
+              <button onClick={() => setShowEditCampaign(false)} className="flex-1 px-4 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-sm transition-colors">Cancel</button>
+              <button onClick={saveCampaignDetails} disabled={savingCampaign || !editName}
+                className="flex-1 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+                {savingCampaign ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Content Modal */}
       {showAddContent && (
@@ -502,6 +830,15 @@ export default function CampaignDetail() {
                   <p>• SMS: 3+ days apart, best at 10am/12pm/5pm/7pm</p>
                   <p>• Social: 1+ day apart, best at 8am/12pm/5pm/8pm</p>
                 </div>
+                <div className="mt-2 pt-2 border-t border-[var(--card-border)]">
+                  <p className="text-xs font-medium mb-1">Conflict Detection:</p>
+                  <div className="space-y-1 text-xs text-[var(--muted)]">
+                    <p>• No same-channel content on the same day</p>
+                    <p>• No overlapping send times across channels</p>
+                    {campaign?.company_id && <p>• Checks all campaigns for this company</p>}
+                  </div>
+                </div>
+                <p className="text-xs text-[var(--muted)] mt-2">Times shown in {tzLabel}</p>
               </div>
 
               <div className="flex gap-3">
@@ -605,6 +942,72 @@ export default function CampaignDetail() {
         )}
       </div>
 
+      {/* Schedule Preview */}
+      {(() => {
+        const scheduled = messages.filter((m) => m.send_at).sort((a, b) => new Date(a.send_at!).getTime() - new Date(b.send_at!).getTime());
+        if (scheduled.length === 0) return null;
+
+        // Group by date in campaign timezone
+        const tz = campaign?.timezone || "America/New_York";
+        const byDate: Record<string, CampaignMessage[]> = {};
+        for (const msg of scheduled) {
+          const dateKey = new Date(msg.send_at!).toLocaleDateString("en-US", { timeZone: tz, weekday: "short", month: "short", day: "numeric", year: "numeric" });
+          if (!byDate[dateKey]) byDate[dateKey] = [];
+          byDate[dateKey].push(msg);
+        }
+
+        return (
+          <div className="bg-[var(--card)] border border-[var(--card-border)] rounded-xl p-5 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold">Content Calendar Preview</h3>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-[var(--muted)]">{scheduled.length} scheduled • {tzLabel}</span>
+                <a href="/calendar" className="text-xs text-[var(--accent)] hover:underline">Full Calendar →</a>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {Object.entries(byDate).map(([dateLabel, dayMsgs]) => (
+                <div key={dateLabel}>
+                  <p className="text-xs font-semibold text-[var(--muted)] mb-1.5 uppercase tracking-wide">{dateLabel}</p>
+                  <div className="space-y-1.5 ml-2 border-l-2 border-[var(--card-border)] pl-3">
+                    {dayMsgs.map((msg) => (
+                      <div key={msg.id} className="flex items-start gap-3 group">
+                        <span className={`flex-shrink-0 w-2 h-2 rounded-full mt-1.5 ${
+                          msg.channel === "email" ? "bg-blue-400" : msg.channel === "sms" ? "bg-green-400" : "bg-purple-400"
+                        }`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold">
+                              {formatTimeOnlyTz(msg.send_at!)}
+                            </span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded font-medium uppercase ${channelColors[msg.channel]}`}>
+                              {msg.channel}
+                            </span>
+                            {campaign?.company && (
+                              <span className="text-xs text-[var(--accent)]">{campaign.company.name}</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-[var(--fg)]/70 truncate mt-0.5">
+                            {msg.channel === "email" && msg.subject ? msg.subject : msg.body.slice(0, 80) + (msg.body.length > 80 ? "…" : "")}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => scheduleMessage(msg.id, "")}
+                          className="text-xs text-red-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                          title="Remove schedule"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Channel Filter */}
       <div className="flex gap-2 mb-6">
         <button onClick={() => setActiveChannel("all")} className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${activeChannel === "all" ? "bg-[var(--accent)] text-white" : "bg-white/5 hover:bg-white/10"}`}>
@@ -626,7 +1029,7 @@ export default function CampaignDetail() {
               <div className="flex items-center gap-3">
                 <span className="text-xs font-mono bg-white/5 px-2 py-1 rounded">#{msg.sequence_order}</span>
                 <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium uppercase ${channelColors[msg.channel]}`}>{msg.channel}</span>
-                {msg.send_at && <span className="text-xs text-[var(--muted)]">Scheduled: {new Date(msg.send_at).toLocaleString()}</span>}
+                {msg.send_at && <span className="text-xs text-[var(--muted)]">Scheduled: {formatInTz(msg.send_at)}</span>}
                 {scores[msg.id] && <span className={`text-sm font-bold ${scoreColor(scores[msg.id].score)}`}>{scores[msg.id].score}/100</span>}
               </div>
               <div className="flex gap-1.5 flex-wrap">
@@ -699,7 +1102,7 @@ export default function CampaignDetail() {
 
             {/* Message Content */}
             {editing === msg.id ? (
-              <EditMessage msg={msg} onSave={(updates) => updateMessage(msg.id, updates)} onSchedule={(dt) => scheduleMessage(msg.id, dt)} />
+              <EditMessage msg={msg} onSave={(updates) => updateMessage(msg.id, updates)} onSchedule={(dt) => scheduleMessage(msg.id, dt)} timezone={campaign.timezone || "America/New_York"} />
             ) : (
               <div>
                 {msg.subject && <p className="font-semibold mb-2">Subject: {msg.subject}</p>}
@@ -715,7 +1118,16 @@ export default function CampaignDetail() {
                       .replace(/^\d+\. (.*$)/gm, '<li class="ml-4 list-decimal">$1</li>'),
                   }}
                 />
-                {msg.cta_text && <p className="mt-3 text-xs text-[var(--accent)]">CTA: {msg.cta_text}</p>}
+                {msg.cta_text && (
+                  <p className="mt-3 text-xs text-[var(--accent)]">
+                    CTA: {msg.cta_text}
+                    {msg.cta_url && (
+                      <a href={msg.cta_url} target="_blank" rel="noopener noreferrer" className="ml-2 text-[var(--muted)] hover:text-[var(--accent)] underline">
+                        {msg.cta_url.length > 40 ? msg.cta_url.slice(0, 40) + "…" : msg.cta_url}
+                      </a>
+                    )}
+                  </p>
+                )}
                 {msg.preview_text && <p className="mt-1 text-xs text-[var(--muted)]">Preview: {msg.preview_text}</p>}
               </div>
             )}
@@ -727,7 +1139,12 @@ export default function CampaignDetail() {
                 <input type="datetime-local" value={msg.send_at ? msg.send_at.slice(0, 16) : ""}
                   onChange={(e) => scheduleMessage(msg.id, e.target.value ? new Date(e.target.value).toISOString() : "")}
                   className="bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-[var(--accent)]" />
-                {msg.send_at && <button onClick={() => scheduleMessage(msg.id, "")} className="text-xs text-red-400 hover:underline">Clear</button>}
+                {msg.send_at && (
+                  <>
+                    <span className="text-xs text-[var(--muted)]">{formatInTz(msg.send_at)}</span>
+                    <button onClick={() => scheduleMessage(msg.id, "")} className="text-xs text-red-400 hover:underline">Clear</button>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -738,15 +1155,17 @@ export default function CampaignDetail() {
 }
 
 function EditMessage({
-  msg, onSave, onSchedule,
+  msg, onSave, onSchedule, timezone,
 }: {
   msg: CampaignMessage;
   onSave: (updates: Partial<CampaignMessage>) => void;
   onSchedule: (dt: string) => void;
+  timezone: string;
 }) {
   const [subject, setSubject] = useState(msg.subject || "");
   const [body, setBody] = useState(msg.body);
   const [ctaText, setCtaText] = useState(msg.cta_text || "");
+  const [ctaUrl, setCtaUrl] = useState(msg.cta_url || "");
   const [previewText, setPreviewText] = useState(msg.preview_text || "");
   const [sendAt, setSendAt] = useState(msg.send_at ? msg.send_at.slice(0, 16) : "");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -766,9 +1185,11 @@ function EditMessage({
   }
 
   function handleSave() {
-    onSave({ subject, body, cta_text: ctaText, preview_text: previewText });
+    onSave({ subject, body, cta_text: ctaText, cta_url: ctaUrl || null, preview_text: previewText });
     if (sendAt) onSchedule(new Date(sendAt).toISOString());
   }
+
+  const tzLabel = TIMEZONES.find((t) => t.value === timezone)?.label || timezone;
 
   return (
     <div className="space-y-3">
@@ -805,16 +1226,20 @@ function EditMessage({
       </p>
 
       {msg.channel === "email" && (
-        <div className="grid grid-cols-2 gap-3">
-          <input type="text" value={ctaText} onChange={(e) => setCtaText(e.target.value)} placeholder="CTA text"
-            className="bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
-          <input type="text" value={previewText} onChange={(e) => setPreviewText(e.target.value)} placeholder="Preview text"
-            className="bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <input type="text" value={ctaText} onChange={(e) => setCtaText(e.target.value)} placeholder="CTA button text (e.g. Get Started)"
+              className="bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
+            <input type="text" value={previewText} onChange={(e) => setPreviewText(e.target.value)} placeholder="Preview text"
+              className="bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
+          </div>
+          <input type="url" value={ctaUrl} onChange={(e) => setCtaUrl(e.target.value)} placeholder="CTA link URL (e.g. https://yoursite.com/offer)"
+            className="w-full bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
         </div>
       )}
 
       <div className="flex items-center gap-3">
-        <label className="text-xs text-[var(--muted)]">Schedule:</label>
+        <label className="text-xs text-[var(--muted)]">Schedule ({tzLabel}):</label>
         <input type="datetime-local" value={sendAt} onChange={(e) => setSendAt(e.target.value)}
           className="bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-[var(--accent)]" />
       </div>

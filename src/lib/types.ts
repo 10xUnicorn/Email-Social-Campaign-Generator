@@ -69,6 +69,8 @@ export interface Campaign {
   imported_content: string | null;
   variable_set_id: string | null;
   duplicated_from_id: string | null;
+  timezone: string;
+  email_style: string | null;
   created_at: string;
   updated_at: string;
   brand_voice?: BrandVoice;
