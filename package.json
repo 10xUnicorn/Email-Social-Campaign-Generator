@@ -1,0 +1,69 @@
+{
+<<<<<<< HEAD
+  "name": "campaign-generator",
+=======
+  "name": "mass-distribution-platform",
+>>>>>>> 267c82c7d15ebb733f719d8beda022484903d5ae
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+<<<<<<< HEAD
+    "lint": "next lint"
+=======
+    "lint": "next lint",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "type-check": "tsc --noEmit"
+>>>>>>> 267c82c7d15ebb733f719d8beda022484903d5ae
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
+<<<<<<< HEAD
+=======
+    "@prisma/client": "^7.5.0",
+>>>>>>> 267c82c7d15ebb733f719d8beda022484903d5ae
+    "@supabase/supabase-js": "^2.99.3",
+    "@tailwindcss/postcss": "^4.2.2",
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+<<<<<<< HEAD
+    "next": "^16.2.1",
+    "postcss": "^8.5.8",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^5.9.3"
+=======
+    "autoprefixer": "^10.4.27",
+    "bullmq": "^5.71.0",
+    "cheerio": "^1.2.0",
+    "ioredis": "^5.10.1",
+    "lucide-react": "^0.577.0",
+    "next": "^16.2.1",
+    "postcss": "^8.5.8",
+    "prisma": "^7.5.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tailwindcss": "^4.2.2",
+    "turndown": "^7.2.2",
+    "typescript": "^5.9.3",
+    "uuid": "^13.0.0",
+    "xml2js": "^0.6.2",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/cheerio": "^0.22.35",
+    "@types/turndown": "^5.0.6",
+    "@types/uuid": "^10.0.0",
+    "@types/xml2js": "^0.4.14"
+>>>>>>> 267c82c7d15ebb733f719d8beda022484903d5ae
+  }
+}
