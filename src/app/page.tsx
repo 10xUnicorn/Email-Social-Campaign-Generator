@@ -63,19 +63,14 @@ export default function Home() {
             AI-generated multi-channel campaigns
           </p>
         </div>
-        <div className="flex gap-3">
-          <a
-            href="/companies"
-            className="px-4 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-sm transition-colors"
-          >
-            Companies
-          </a>
-          <a
-            href="/campaigns/new"
-            className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-5 py-2.5 rounded-lg font-medium transition-colors"
-          >
-            + New Campaign
-          </a>
+        <div className="flex gap-3 flex-wrap">
+          <a href="/calendar" className="px-4 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-sm transition-colors">Calendar</a>
+          <a href="/social-profiles" className="px-4 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-sm transition-colors">Social Profiles</a>
+          <a href="/media-library" className="px-4 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-sm transition-colors">Media Library</a>
+          <a href="/companies" className="px-4 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-sm transition-colors">Companies</a>
+          <a href="/brand-voices" className="px-4 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-sm transition-colors">Brand Voices</a>
+          <a href="/variables" className="px-4 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-sm transition-colors">Variables</a>
+          <a href="/campaigns/new" className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-5 py-2.5 rounded-lg font-medium transition-colors">+ New Campaign</a>
         </div>
       </div>
 
