@@ -27,11 +27,7 @@ export default function ExportModal({
 
   // CSV mapping state
   const [mappings, setMappings] = useState<FieldMapping[]>(
-    EXPORTABLE_FIELDS.map((f) => ({
-      system_field: f.key,
-      csv_header: f.label,
-      enabled: true,
-    }))
+    EXPORTABLE_FIELDS.map((f) => ({ ...f }))
   );
   const [profiles, setProfiles] = useState<CsvMappingProfile[]>([]);
   const [selectedProfileId, setSelectedProfileId] = useState<string>("");
@@ -83,9 +79,9 @@ export default function ExportModal({
       // Merge profile mappings with full field list (in case new fields were added)
       const merged = EXPORTABLE_FIELDS.map((f) => {
         const existing = profile.field_mappings.find(
-          (m: FieldMapping) => m.system_field === f.key
+          (m: FieldMapping) => m.field === f.field
         );
-        return existing || { system_field: f.key, csv_header: f.label, enabled: false };
+        return existing || { ...f, enabled: false };
       });
       setMappings(merged);
     }
@@ -125,13 +121,7 @@ export default function ExportModal({
     await fetch(`/api/csv-profiles?id=${id}`, { method: "DELETE" });
     if (selectedProfileId === id) {
       setSelectedProfileId("");
-      setMappings(
-        EXPORTABLE_FIELDS.map((f) => ({
-          system_field: f.key,
-          csv_header: f.label,
-          enabled: true,
-        }))
-      );
+      setMappings(EXPORTABLE_FIELDS.map((f) => ({ ...f })));
     }
     await loadProfiles();
   };
@@ -162,19 +152,19 @@ export default function ExportModal({
         (h) => h.toLowerCase() === f.label.toLowerCase()
       );
       if (exactMatch) {
-        return { system_field: f.key, csv_header: exactMatch, enabled: true };
+        return { ...f, header: exactMatch, enabled: true };
       }
       // Try fuzzy match
       const fuzzy = headers.find((h) => {
         const hLower = h.toLowerCase().replace(/[^a-z0-9]/g, "");
         const fLower = f.label.toLowerCase().replace(/[^a-z0-9]/g, "");
-        const kLower = f.key.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const kLower = f.field.toLowerCase().replace(/[^a-z0-9]/g, "");
         return hLower.includes(fLower) || fLower.includes(hLower) || hLower === kLower;
       });
       if (fuzzy) {
-        return { system_field: f.key, csv_header: fuzzy, enabled: true };
+        return { ...f, header: fuzzy, enabled: true };
       }
-      return { system_field: f.key, csv_header: f.label, enabled: false };
+      return { ...f, enabled: false };
     });
     setMappings(newMappings);
   };
@@ -187,13 +177,13 @@ export default function ExportModal({
       const tagClean = v.tag.replace(/[{}%]/g, "").toLowerCase();
       const idx = newMappings.findIndex(
         (m) =>
-          m.system_field.toLowerCase().includes(tagClean) ||
-          tagClean.includes(m.system_field.toLowerCase())
+          m.field.toLowerCase().includes(tagClean) ||
+          tagClean.includes(m.field.toLowerCase())
       );
       if (idx >= 0) {
         newMappings[idx] = {
           ...newMappings[idx],
-          csv_header: v.label || v.tag,
+          header: v.label || v.tag,
           enabled: true,
         };
       }
@@ -209,7 +199,7 @@ export default function ExportModal({
 
   const updateHeader = (idx: number, value: string) => {
     const updated = [...mappings];
-    updated[idx] = { ...updated[idx], csv_header: value };
+    updated[idx] = { ...updated[idx], header: value };
     setMappings(updated);
   };
 
@@ -491,13 +481,7 @@ export default function ExportModal({
               )}
               <button
                 onClick={() =>
-                  setMappings(
-                    EXPORTABLE_FIELDS.map((f) => ({
-                      system_field: f.key,
-                      csv_header: f.label,
-                      enabled: true,
-                    }))
-                  )
+                  setMappings(EXPORTABLE_FIELDS.map((f) => ({ ...f })))
                 }
                 style={{
                   padding: "7px 14px",
@@ -565,10 +549,10 @@ export default function ExportModal({
                 </thead>
                 <tbody>
                   {mappings.map((m, idx) => {
-                    const fieldMeta = EXPORTABLE_FIELDS.find((f) => f.key === m.system_field);
+                    const fieldMeta = EXPORTABLE_FIELDS.find((f) => f.field === m.field);
                     return (
                       <tr
-                        key={m.system_field}
+                        key={m.field}
                         style={{
                           borderTop: "1px solid #333",
                           opacity: m.enabled ? 1 : 0.4,
@@ -583,12 +567,12 @@ export default function ExportModal({
                           />
                         </td>
                         <td style={{ padding: "6px 10px" }}>
-                          <div style={{ fontSize: 13, color: "#ddd" }}>{fieldMeta?.label || m.system_field}</div>
+                          <div style={{ fontSize: 13, color: "#ddd" }}>{fieldMeta?.label || m.field}</div>
                           <div style={{ fontSize: 10, color: "#666" }}>{fieldMeta?.category}</div>
                         </td>
                         <td style={{ padding: "6px 10px" }}>
                           <input
-                            value={m.csv_header}
+                            value={m.header}
                             onChange={(e) => updateHeader(idx, e.target.value)}
                             style={{
                               width: "100%",
