@@ -1157,21 +1157,21 @@ export default function CampaignDetail() {
         ))}
       </div>
 
-      {showExport && (
-        <ExportModal
-          campaignIds={[campaign.id]}
-          messageIds={messages.map((m) => m.id)}
-          onClose={() => setShowExport(false)}
-        />
-      )}
+      <ExportModal
+        open={showExport}
+        campaignIds={[campaign.id]}
+        messageIds={messages.map((m) => m.id)}
+        companyId={campaign.company_id}
+        onClose={() => setShowExport(false)}
+      />
 
-      {showPublish && (
-        <PublishModal
-          campaignId={campaign.id}
-          messages={messages.filter((m) => m.channel === "social")}
-          onClose={() => setShowPublish(false)}
-        />
-      )}
+      <PublishModal
+        open={showPublish}
+        campaignId={campaign.id}
+        messages={messages.filter((m) => m.channel === "social")}
+        companyId={campaign.company_id}
+        onClose={() => setShowPublish(false)}
+      />
     </div>
   );
 }

@@ -349,13 +349,12 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {showExport && (
-        <ExportModal
-          campaignIds={[...new Set(items.map((i) => i.campaign_id))]}
-          messageIds={items.map((i) => i.id)}
-          onClose={() => setShowExport(false)}
-        />
-      )}
+      <ExportModal
+        open={showExport}
+        campaignIds={[...new Set(items.map((i) => i.campaign_id))]}
+        messageIds={items.map((i) => i.id)}
+        onClose={() => setShowExport(false)}
+      />
     </div>
   );
 }
