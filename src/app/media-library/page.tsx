@@ -195,7 +195,7 @@ export default function MediaLibraryPage() {
                 {item.thumbnail_url ? (
                   <img
                     src={item.thumbnail_url}
-                    alt={item.title}
+                    alt={item.title || ""}
                     className="w-full h-full object-cover"
                   />
                 ) : (
