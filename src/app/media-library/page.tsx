@@ -100,7 +100,7 @@ export default function MediaLibraryPage() {
 
   const platformCounts = items.reduce(
     (acc, i) => {
-      const p = i.source_platform || "other";
+      const p = i.platform || "other";
       acc[p] = (acc[p] || 0) + 1;
       return acc;
     },
@@ -203,7 +203,7 @@ export default function MediaLibraryPage() {
                 )}
                 <div className="absolute top-2 left-2 flex gap-1">
                   <span className="text-xs px-2 py-0.5 rounded-full bg-black/60 text-white">
-                    {PLATFORM_ICONS[item.source_platform || "other"]} {item.source_platform}
+                    {PLATFORM_ICONS[item.platform || "other"]} {item.platform}
                   </span>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-black/60 text-white">
                     {item.media_type}
