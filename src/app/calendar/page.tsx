@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import ExportModal from "@/components/ExportModal";
 
 interface ScheduledItem {
   id: string;
@@ -25,6 +26,7 @@ export default function CalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [showExport, setShowExport] = useState(false);
 
   useEffect(() => {
     loadScheduled();
@@ -121,6 +123,7 @@ export default function CalendarPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <button onClick={() => setShowExport(true)} className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium transition-colors">Export</button>
           <a href="/" className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs transition-colors">
             Dashboard
           </a>
@@ -344,6 +347,14 @@ export default function CalendarPage() {
             ))
           )}
         </div>
+      )}
+
+      {showExport && (
+        <ExportModal
+          campaignIds={[...new Set(items.map((i) => i.campaign_id))]}
+          messageIds={items.map((i) => i.id)}
+          onClose={() => setShowExport(false)}
+        />
       )}
     </div>
   );

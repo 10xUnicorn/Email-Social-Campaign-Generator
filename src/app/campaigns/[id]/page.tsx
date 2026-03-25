@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import type { Campaign, CampaignMessage, CampaignFile, BrandVoice, Company } from "@/lib/types";
+import ExportModal from "@/components/ExportModal";
+import PublishModal from "@/components/PublishModal";
 
 const REVISE_PRESETS = [
   { label: "More Urgent", prompt: "Make this more urgent with stronger calls to action" },
@@ -78,6 +80,8 @@ export default function CampaignDetail() {
 
   // Edit campaign details state
   const [showEditCampaign, setShowEditCampaign] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [showPublish, setShowPublish] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editGoal, setEditGoal] = useState("");
@@ -638,6 +642,8 @@ export default function CampaignDetail() {
           <button onClick={() => { setShowScheduleConfig(true); setScheduleStartDate(new Date().toISOString().split("T")[0]); }} className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm transition-colors" title={`${unscheduledCount} unscheduled`}>
             Auto-Schedule {unscheduledCount > 0 && `(${unscheduledCount})`}
           </button>
+          <button onClick={() => setShowExport(true)} className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Export</button>
+          <button onClick={() => setShowPublish(true)} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Publish</button>
           <button onClick={() => { setDupChannels(uniqueChannels); setShowDupModal(true); }} className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm transition-colors">Duplicate</button>
           <a href="/calendar" className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm transition-colors">Calendar</a>
           {campaign.status === "draft" && (
@@ -1150,6 +1156,22 @@ export default function CampaignDetail() {
           </div>
         ))}
       </div>
+
+      {showExport && (
+        <ExportModal
+          campaignIds={[campaign.id]}
+          messageIds={messages.map((m) => m.id)}
+          onClose={() => setShowExport(false)}
+        />
+      )}
+
+      {showPublish && (
+        <PublishModal
+          campaignId={campaign.id}
+          messages={messages.filter((m) => m.channel === "social")}
+          onClose={() => setShowPublish(false)}
+        />
+      )}
     </div>
   );
 }
