@@ -342,57 +342,52 @@ export default function SocialProfilesPage() {
                   API Credentials — {config?.label}
                 </h4>
 
-                {config?.fields.includes("api_key") && (
-                  <div className="mb-3">
-                    <label className="block text-xs text-[var(--muted)] mb-1.5">API Key</label>
-                    <input
-                      type="password"
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      placeholder="Enter API key..."
-                      className="w-full bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)]"
-                    />
-                  </div>
+                {(platform === "x") && (
+                  <>
+                    <div className="mb-3">
+                      <label className="block text-xs text-[var(--muted)] mb-1.5">API Key</label>
+                      <input
+                        type="password"
+                        value={apiKey}
+                        onChange={(e) => setApiKey(e.target.value)}
+                        placeholder="Enter API key..."
+                        className="w-full bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)]"
+                      />
+                    </div>
+                    <div className="mb-3">
+                      <label className="block text-xs text-[var(--muted)] mb-1.5">API Secret</label>
+                      <input
+                        type="password"
+                        value={apiSecret}
+                        onChange={(e) => setApiSecret(e.target.value)}
+                        placeholder="Enter API secret..."
+                        className="w-full bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)]"
+                      />
+                    </div>
+                  </>
                 )}
 
-                {config?.fields.includes("api_secret") && (
-                  <div className="mb-3">
-                    <label className="block text-xs text-[var(--muted)] mb-1.5">API Secret</label>
-                    <input
-                      type="password"
-                      value={apiSecret}
-                      onChange={(e) => setApiSecret(e.target.value)}
-                      placeholder="Enter API secret..."
-                      className="w-full bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)]"
-                    />
-                  </div>
-                )}
+                <div className="mb-3">
+                  <label className="block text-xs text-[var(--muted)] mb-1.5">Access Token</label>
+                  <input
+                    type="password"
+                    value={accessToken}
+                    onChange={(e) => setAccessToken(e.target.value)}
+                    placeholder="Enter access token..."
+                    className="w-full bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)]"
+                  />
+                </div>
 
-                {config?.fields.includes("access_token") && (
-                  <div className="mb-3">
-                    <label className="block text-xs text-[var(--muted)] mb-1.5">Access Token</label>
-                    <input
-                      type="password"
-                      value={accessToken}
-                      onChange={(e) => setAccessToken(e.target.value)}
-                      placeholder="Enter access token..."
-                      className="w-full bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)]"
-                    />
-                  </div>
-                )}
-
-                {config?.fields.includes("refresh_token") && (
-                  <div className="mb-3">
-                    <label className="block text-xs text-[var(--muted)] mb-1.5">Refresh Token</label>
-                    <input
-                      type="password"
-                      value={refreshToken}
-                      onChange={(e) => setRefreshToken(e.target.value)}
-                      placeholder="Enter refresh token..."
-                      className="w-full bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)]"
-                    />
-                  </div>
-                )}
+                <div className="mb-3">
+                  <label className="block text-xs text-[var(--muted)] mb-1.5">Refresh Token (optional)</label>
+                  <input
+                    type="password"
+                    value={refreshToken}
+                    onChange={(e) => setRefreshToken(e.target.value)}
+                    placeholder="Enter refresh token..."
+                    className="w-full bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)]"
+                  />
+                </div>
 
                 <p className="text-xs text-[var(--muted)] mt-2 leading-relaxed">
                   {platform === "x" && "Get credentials from developer.x.com > Your App > Keys & Tokens. Need OAuth 2.0 User Auth with tweet.write scope."}
