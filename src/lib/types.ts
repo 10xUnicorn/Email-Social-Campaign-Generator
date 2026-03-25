@@ -160,6 +160,7 @@ export interface SocialProfile {
   platform: "instagram" | "facebook" | "linkedin" | "x" | "tiktok";
   profile_name: string;
   profile_id: string | null;
+  profile_url: string | null;
   access_token: string | null;
   refresh_token: string | null;
   api_key: string | null;
