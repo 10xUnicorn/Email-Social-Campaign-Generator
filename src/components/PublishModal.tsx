@@ -400,7 +400,7 @@ export default function PublishModal({
                     <span style={{ fontSize: 16 }}>{cfg?.icon || "🌐"}</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: "#ddd" }}>
-                        {(post.social_profile as { profile_name?: string })?.profile_name || post.platform}
+                        {(post as unknown as { social_profile?: { profile_name?: string } }).social_profile?.profile_name || post.platform}
                       </div>
                       <div style={{ fontSize: 11, color: "#888" }}>
                         {new Date(post.published_at).toLocaleString()}
