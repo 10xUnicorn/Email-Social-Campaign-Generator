@@ -7,8 +7,10 @@ const supabase = createClient(
 );
 
 interface FieldMapping {
-  system_field: string;
-  csv_header: string;
+  field: string;
+  header: string;
+  label: string;
+  category: string;
   enabled: boolean;
 }
 
@@ -96,11 +98,11 @@ export async function POST(request: Request) {
     }
 
     // Build CSV
-    const headers = enabledMappings.map((m) => escapeCSV(m.csv_header));
+    const headers = enabledMappings.map((m) => escapeCSV(m.header));
     const rows = messages.map((msg) => {
       const campaign = campaignMap[String(msg.campaign_id)] || {};
       return enabledMappings
-        .map((m) => escapeCSV(resolveField(msg, campaign, m.system_field)))
+        .map((m) => escapeCSV(resolveField(msg, campaign, m.field)))
         .join(",");
     });
 
