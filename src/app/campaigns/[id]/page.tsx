@@ -97,6 +97,7 @@ export default function CampaignDetail() {
 
   // Media assets state
   const [showMediaPanel, setShowMediaPanel] = useState(false);
+  const [calendarCollapsed, setCalendarCollapsed] = useState(false);
   const [mediaAssets, setMediaAssets] = useState<{ url: string; type: "image" | "video"; description: string }[]>([]);
   const [newMediaUrl, setNewMediaUrl] = useState("");
   const [newMediaType, setNewMediaType] = useState<"image" | "video">("image");
@@ -1115,14 +1116,20 @@ export default function CampaignDetail() {
 
         return (
           <div className="bg-[var(--card)] border border-[var(--card-border)] rounded-xl p-5 mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold">Content Calendar Preview</h3>
+            <div
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setCalendarCollapsed(!calendarCollapsed)}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-[var(--muted)] transition-transform" style={{ display: "inline-block", transform: calendarCollapsed ? "rotate(-90deg)" : "rotate(0deg)" }}>▼</span>
+                <h3 className="text-sm font-semibold">Content Calendar Preview</h3>
+              </div>
               <div className="flex items-center gap-3">
                 <span className="text-xs text-[var(--muted)]">{scheduled.length} scheduled • {tzLabel}</span>
-                <a href="/calendar" className="text-xs text-[var(--accent)] hover:underline">Full Calendar →</a>
+                <a href="/calendar" className="text-xs text-[var(--accent)] hover:underline" onClick={(e) => e.stopPropagation()}>Full Calendar →</a>
               </div>
             </div>
-            <div className="space-y-3">
+            {!calendarCollapsed && <div className="space-y-3 mt-4">
               {Object.entries(byDate).map(([dateLabel, dayMsgs]) => (
                 <div key={dateLabel}>
                   <p className="text-xs font-semibold text-[var(--muted)] mb-1.5 uppercase tracking-wide">{dateLabel}</p>
@@ -1160,7 +1167,7 @@ export default function CampaignDetail() {
                   </div>
                 </div>
               ))}
-            </div>
+            </div>}
           </div>
         );
       })()}
