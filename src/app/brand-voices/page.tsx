@@ -480,7 +480,12 @@ function CreateVoice({
                   disabled={importingIdx !== null || !url}
                   className="bg-white/10 hover:bg-white/15 px-3 py-2 rounded-lg text-xs transition-colors disabled:opacity-50 whitespace-nowrap"
                 >
-                  {importingIdx === idx ? "..." : "Import"}
+                  {importingIdx === idx ? (
+                    <span className="flex items-center gap-1.5">
+                      <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                      Importing…
+                    </span>
+                  ) : "Import"}
                 </button>
                 {urls.length > 1 && (
                   <button
@@ -832,7 +837,12 @@ function EditVoice({
             disabled={importingUrl || !newUrl}
             className="bg-white/10 hover:bg-white/15 px-3 py-1.5 rounded-lg text-xs transition-colors disabled:opacity-50"
           >
-            {importingUrl ? "..." : "Import"}
+            {importingUrl ? (
+              <span className="flex items-center gap-1.5">
+                <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                Importing…
+              </span>
+            ) : "Import"}
           </button>
         </div>
       </div>
