@@ -44,9 +44,19 @@ export default function ExportModal({
   const [uploadedHeaders, setUploadedHeaders] = useState<string[]>([]);
   const [copiedHeader, setCopiedHeader] = useState<string | null>(null);
 
-  // Sort
-  const [sortField, setSortField] = useState("");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  // Reorder helpers
+  const moveFieldUp = (idx: number) => {
+    if (idx <= 0) return;
+    const updated = [...mappings];
+    [updated[idx - 1], updated[idx]] = [updated[idx], updated[idx - 1]];
+    setMappings(updated);
+  };
+  const moveFieldDown = (idx: number) => {
+    if (idx >= mappings.length - 1) return;
+    const updated = [...mappings];
+    [updated[idx], updated[idx + 1]] = [updated[idx + 1], updated[idx]];
+    setMappings(updated);
+  };
 
   // Manual header add
   const [showManualAdd, setShowManualAdd] = useState(false);
@@ -225,10 +235,6 @@ export default function ExportModal({
 
       if (format === "csv") {
         payload.field_mappings = mappings;
-        if (sortField) {
-          payload.sort_field = sortField;
-          payload.sort_direction = sortDirection;
-        }
         const res = await fetch("/api/export-csv", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -575,6 +581,9 @@ export default function ExportModal({
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ background: "#2a2a3c" }}>
+                    <th style={{ padding: "8px 6px", textAlign: "center", color: "#888", fontSize: 11, fontWeight: 600, width: 50 }}>
+                      Order
+                    </th>
                     <th style={{ padding: "8px 10px", textAlign: "left", color: "#888", fontSize: 11, fontWeight: 600, width: 40 }}>
                       ON
                     </th>
@@ -597,6 +606,26 @@ export default function ExportModal({
                           opacity: m.enabled ? 1 : 0.4,
                         }}
                       >
+                        <td style={{ padding: "4px 6px", textAlign: "center" }}>
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
+                            <button
+                              onClick={() => moveFieldUp(idx)}
+                              disabled={idx === 0}
+                              style={{ background: "none", border: "none", color: idx === 0 ? "#333" : "#888", cursor: idx === 0 ? "default" : "pointer", fontSize: 11, lineHeight: 1, padding: "1px 4px" }}
+                              title="Move up"
+                            >
+                              ▲
+                            </button>
+                            <button
+                              onClick={() => moveFieldDown(idx)}
+                              disabled={idx === mappings.length - 1}
+                              style={{ background: "none", border: "none", color: idx === mappings.length - 1 ? "#333" : "#888", cursor: idx === mappings.length - 1 ? "default" : "pointer", fontSize: 11, lineHeight: 1, padding: "1px 4px" }}
+                              title="Move down"
+                            >
+                              ▼
+                            </button>
+                          </div>
+                        </td>
                         <td style={{ padding: "6px 10px" }}>
                           <input
                             type="checkbox"
@@ -688,27 +717,9 @@ export default function ExportModal({
               </div>
             )}
 
-            {/* Sort control */}
-            <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center" }}>
-              <label style={{ fontSize: 11, color: "#888", whiteSpace: "nowrap" }}>Sort by:</label>
-              <select
-                value={sortField}
-                onChange={(e) => setSortField(e.target.value)}
-                style={{ flex: 1, padding: "6px 8px", borderRadius: 4, border: "1px solid #444", background: "#2a2a3c", color: "#ddd", fontSize: 11 }}
-              >
-                <option value="">— No sorting —</option>
-                {mappings.filter((m) => m.enabled).map((m) => (
-                  <option key={m.field} value={m.field}>{m.header || m.label}</option>
-                ))}
-              </select>
-              <select
-                value={sortDirection}
-                onChange={(e) => setSortDirection(e.target.value as "asc" | "desc")}
-                style={{ padding: "6px 8px", borderRadius: 4, border: "1px solid #444", background: "#2a2a3c", color: "#ddd", fontSize: 11, width: 80 }}
-              >
-                <option value="asc">A → Z</option>
-                <option value="desc">Z → A</option>
-              </select>
+            {/* Column order hint */}
+            <div style={{ fontSize: 11, color: "#666", marginTop: 8 }}>
+              Use ▲▼ arrows to reorder columns. Top = first column in the export file.
             </div>
           </div>
         )}
