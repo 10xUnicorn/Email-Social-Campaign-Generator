@@ -13,7 +13,7 @@ const PLATFORMS = [
   { id: "tiktok", label: "TikTok", icon: "🎵", color: "from-cyan-500/20 to-teal-500/20 border-cyan-500/30" },
 ];
 
-export default function ContentIngest() {
+export default function ContentRepurpose() {
   const [content, setContent] = useState("");
   const [contentType, setContentType] = useState<"video" | "image" | "text">("text");
   const [platforms, setPlatforms] = useState<string[]>(["instagram", "linkedin", "x"]);
@@ -302,7 +302,7 @@ export default function ContentIngest() {
         background: "linear-gradient(135deg, #059669 0%, #0891b2 50%, #7c3aed 100%)",
       }}>
         <div className="relative">
-          <h1 className="text-4xl font-extrabold text-white mb-2 tracking-tight">Content Ingest</h1>
+          <h1 className="text-4xl font-extrabold text-white mb-2 tracking-tight">Content Repurpose</h1>
           <p className="text-white/80 text-lg">
             Drop one piece of content → Get {totalPosts} platform-optimized posts scheduled across {daysSpan} days.
           </p>
