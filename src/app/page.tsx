@@ -70,6 +70,7 @@ export default function Home() {
           <a href="/companies" className="px-4 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-sm transition-colors">Companies</a>
           <a href="/brand-voices" className="px-4 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-sm transition-colors">Brand Voices</a>
           <a href="/variables" className="px-4 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-sm transition-colors">Variables</a>
+          <a href="/content-ingest" className="px-5 py-2.5 rounded-lg font-medium text-sm transition-colors text-white" style={{background: "linear-gradient(135deg, #7c3aed, #db2777)"}}>Content Splitter</a>
           <a href="/campaigns/new" className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-5 py-2.5 rounded-lg font-medium transition-colors">+ New Campaign</a>
         </div>
       </div>
