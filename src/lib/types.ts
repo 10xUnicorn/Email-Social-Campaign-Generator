@@ -89,6 +89,8 @@ export interface CampaignMessage {
   preview_text: string | null;
   cta_text: string | null;
   cta_url: string | null;
+  image_url: string | null;
+  video_url: string | null;
   send_at: string | null;
   status: "draft" | "scheduled" | "sent";
   created_at: string;
@@ -226,6 +228,8 @@ export const EXPORTABLE_FIELDS: FieldMapping[] = [
   { field: "preview_text", label: "Preview Text", header: "Preview Text", enabled: true, category: "Message" },
   { field: "cta_text", label: "CTA Text", header: "CTA", enabled: true, category: "Message" },
   { field: "cta_url", label: "CTA URL", header: "CTA URL", enabled: false, category: "Message" },
+  { field: "image_url", label: "Image URL", header: "Image URL", enabled: true, category: "Media" },
+  { field: "video_url", label: "Video URL", header: "Video URL", enabled: true, category: "Media" },
   { field: "sequence_order", label: "Sequence #", header: "Sequence", enabled: true, category: "Schedule" },
   { field: "send_at", label: "Send Date/Time", header: "Send At", enabled: true, category: "Schedule" },
   { field: "status", label: "Status", header: "Status", enabled: true, category: "Schedule" },

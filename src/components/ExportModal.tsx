@@ -42,6 +42,16 @@ export default function ExportModal({
   // CSV upload for auto-match
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadedHeaders, setUploadedHeaders] = useState<string[]>([]);
+  const [copiedHeader, setCopiedHeader] = useState<string | null>(null);
+
+  // Sort
+  const [sortField, setSortField] = useState("");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  // Manual header add
+  const [showManualAdd, setShowManualAdd] = useState(false);
+  const [manualField, setManualField] = useState("");
+  const [manualHeader, setManualHeader] = useState("");
 
   const loadProfiles = useCallback(async () => {
     try {
@@ -215,6 +225,10 @@ export default function ExportModal({
 
       if (format === "csv") {
         payload.field_mappings = mappings;
+        if (sortField) {
+          payload.sort_field = sortField;
+          payload.sort_direction = sortDirection;
+        }
         const res = await fetch("/api/export-csv", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -497,27 +511,52 @@ export default function ExportModal({
               </button>
             </div>
 
-            {/* Uploaded headers preview */}
+            {/* Uploaded headers preview — click to copy */}
             {uploadedHeaders.length > 0 && (
               <div style={{ background: "#2a2a3c", borderRadius: 8, padding: 10, marginBottom: 14, border: "1px solid #444" }}>
-                <div style={{ fontSize: 11, color: "#888", marginBottom: 6 }}>
-                  Detected CSV Headers ({uploadedHeaders.length}):
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <div style={{ fontSize: 11, color: "#888" }}>
+                    Detected CSV Headers ({uploadedHeaders.length}) — click to copy:
+                  </div>
+                  <button
+                    onClick={() => autoMatchHeaders(uploadedHeaders)}
+                    style={{
+                      padding: "3px 10px",
+                      borderRadius: 4,
+                      border: "1px solid #8b5cf6",
+                      background: "rgba(139,92,246,0.15)",
+                      color: "#a78bfa",
+                      fontSize: 10,
+                      cursor: "pointer",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Auto-Detect
+                  </button>
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {uploadedHeaders.map((h, i) => (
-                    <span
+                    <button
                       key={i}
+                      onClick={() => {
+                        navigator.clipboard.writeText(h);
+                        setCopiedHeader(h);
+                        setTimeout(() => setCopiedHeader(null), 1500);
+                      }}
                       style={{
                         padding: "3px 8px",
                         borderRadius: 4,
-                        background: "#1e1e2e",
-                        color: "#a78bfa",
+                        background: copiedHeader === h ? "rgba(34,197,94,0.2)" : "#1e1e2e",
+                        color: copiedHeader === h ? "#4ade80" : "#a78bfa",
                         fontSize: 11,
-                        border: "1px solid #555",
+                        border: copiedHeader === h ? "1px solid #22c55e" : "1px solid #555",
+                        cursor: "pointer",
+                        transition: "all 0.15s",
                       }}
+                      title={`Click to copy "${h}"`}
                     >
-                      {h}
-                    </span>
+                      {copiedHeader === h ? "Copied!" : h}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -592,8 +631,84 @@ export default function ExportModal({
               </table>
             </div>
 
-            <div style={{ fontSize: 11, color: "#666", marginTop: 8 }}>
-              {enabledCount} of {mappings.length} fields enabled
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+              <div style={{ fontSize: 11, color: "#666" }}>
+                {enabledCount} of {mappings.length} fields enabled
+              </div>
+              <button
+                onClick={() => setShowManualAdd(!showManualAdd)}
+                style={{
+                  padding: "3px 10px",
+                  borderRadius: 4,
+                  border: "1px solid #444",
+                  background: "transparent",
+                  color: "#aaa",
+                  fontSize: 10,
+                  cursor: "pointer",
+                }}
+              >
+                + Add Header Manually
+              </button>
+            </div>
+
+            {/* Manual header add */}
+            {showManualAdd && (
+              <div style={{ background: "#2a2a3c", borderRadius: 8, padding: 12, marginTop: 8, border: "1px solid #444", display: "flex", gap: 8, alignItems: "flex-end" }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 10, color: "#888", display: "block", marginBottom: 3 }}>Field Key</label>
+                  <input
+                    value={manualField}
+                    onChange={(e) => setManualField(e.target.value)}
+                    placeholder="e.g. custom_field"
+                    style={{ width: "100%", padding: "6px 8px", borderRadius: 4, border: "1px solid #555", background: "#1e1e2e", color: "#ddd", fontSize: 12 }}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 10, color: "#888", display: "block", marginBottom: 3 }}>CSV Header Name</label>
+                  <input
+                    value={manualHeader}
+                    onChange={(e) => setManualHeader(e.target.value)}
+                    placeholder="e.g. Custom Field"
+                    style={{ width: "100%", padding: "6px 8px", borderRadius: 4, border: "1px solid #555", background: "#1e1e2e", color: "#ddd", fontSize: 12 }}
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    if (manualField.trim() && manualHeader.trim()) {
+                      setMappings((prev) => [...prev, { field: manualField.trim(), label: manualHeader.trim(), header: manualHeader.trim(), enabled: true, category: "Custom" }]);
+                      setManualField("");
+                      setManualHeader("");
+                      setShowManualAdd(false);
+                    }
+                  }}
+                  style={{ padding: "6px 14px", borderRadius: 4, border: "none", background: "#8b5cf6", color: "#fff", fontSize: 11, cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}
+                >
+                  Add
+                </button>
+              </div>
+            )}
+
+            {/* Sort control */}
+            <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center" }}>
+              <label style={{ fontSize: 11, color: "#888", whiteSpace: "nowrap" }}>Sort by:</label>
+              <select
+                value={sortField}
+                onChange={(e) => setSortField(e.target.value)}
+                style={{ flex: 1, padding: "6px 8px", borderRadius: 4, border: "1px solid #444", background: "#2a2a3c", color: "#ddd", fontSize: 11 }}
+              >
+                <option value="">— No sorting —</option>
+                {mappings.filter((m) => m.enabled).map((m) => (
+                  <option key={m.field} value={m.field}>{m.header || m.label}</option>
+                ))}
+              </select>
+              <select
+                value={sortDirection}
+                onChange={(e) => setSortDirection(e.target.value as "asc" | "desc")}
+                style={{ padding: "6px 8px", borderRadius: 4, border: "1px solid #444", background: "#2a2a3c", color: "#ddd", fontSize: 11, width: 80 }}
+              >
+                <option value="asc">A → Z</option>
+                <option value="desc">Z → A</option>
+              </select>
             </div>
           </div>
         )}

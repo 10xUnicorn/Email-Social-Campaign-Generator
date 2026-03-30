@@ -44,7 +44,7 @@ function resolveField(
 
 export async function POST(request: Request) {
   try {
-    const { campaign_ids, message_ids, field_mappings } = await request.json();
+    const { campaign_ids, message_ids, field_mappings, sort_field, sort_direction } = await request.json();
 
     if (!field_mappings || !Array.isArray(field_mappings)) {
       return NextResponse.json({ error: "field_mappings required" }, { status: 400 });
@@ -95,6 +95,16 @@ export async function POST(request: Request) {
           company_name: company?.name || "",
         };
       }
+    }
+
+    // Sort messages if requested
+    if (sort_field) {
+      const dir = sort_direction === "desc" ? -1 : 1;
+      messages.sort((a, b) => {
+        const aVal = String(a[sort_field] ?? "");
+        const bVal = String(b[sort_field] ?? "");
+        return aVal.localeCompare(bVal) * dir;
+      });
     }
 
     // Build CSV

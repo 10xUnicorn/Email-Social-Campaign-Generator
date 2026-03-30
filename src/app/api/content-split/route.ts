@@ -326,19 +326,27 @@ Return ONLY the JSON array, no other text.`;
       return Response.json({ error: "Failed to create campaign", detail: campError?.message }, { status: 500 });
     }
 
-    // Insert messages
-    const messages = posts.map((post, idx) => ({
-      campaign_id: campaign.id,
-      sequence_order: post.post_number || idx + 1,
-      channel: "social" as const,
-      subject: `[${(post.platform || "social").toUpperCase()}] ${post.hook?.slice(0, 80) || "Post " + (idx + 1)}`,
-      body: post.content,
-      preview_text: post.format || null,
-      cta_text: post.hashtags?.join(" ") || null,
-      cta_url: post.media_url || null,
-      send_at: schedule[idx]?.scheduledAt.toISOString() || null,
-      status: "draft" as const,
-    }));
+    // Insert messages — store media in proper columns (image_url OR video_url, never both)
+    const messages = posts.map((post, idx) => {
+      const mediaUrl = post.media_url || mediaAssignments[idx] || null;
+      const mediaAsset = mediaUrl ? req.media_assets?.find((a) => a.url === mediaUrl) : null;
+      const isVideo = mediaAsset?.type === "video";
+
+      return {
+        campaign_id: campaign.id,
+        sequence_order: post.post_number || idx + 1,
+        channel: "social" as const,
+        subject: `[${(post.platform || "social").toUpperCase()}] ${post.hook?.slice(0, 80) || "Post " + (idx + 1)}`,
+        body: post.content,
+        preview_text: post.format || null,
+        cta_text: post.hashtags?.join(" ") || null,
+        cta_url: null,
+        image_url: mediaUrl && !isVideo ? mediaUrl : null,
+        video_url: mediaUrl && isVideo ? mediaUrl : null,
+        send_at: schedule[idx]?.scheduledAt.toISOString() || null,
+        status: "draft" as const,
+      };
+    });
 
     const { error: msgError } = await supabase.from("campaign_messages").insert(messages);
 

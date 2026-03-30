@@ -1135,6 +1135,21 @@ export default function CampaignDetail() {
                   </p>
                 )}
                 {msg.preview_text && <p className="mt-1 text-xs text-[var(--muted)]">Preview: {msg.preview_text}</p>}
+                {/* Media URL indicators */}
+                {(msg.image_url || msg.video_url) && (
+                  <div className="flex items-center gap-2 mt-2">
+                    {msg.image_url && (
+                      <a href={msg.image_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/20 hover:bg-green-500/25 transition-colors">
+                        Image
+                      </a>
+                    )}
+                    {msg.video_url && (
+                      <a href={msg.video_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/20 hover:bg-blue-500/25 transition-colors">
+                        Video
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1189,6 +1204,8 @@ function EditMessage({
   const [ctaText, setCtaText] = useState(msg.cta_text || "");
   const [ctaUrl, setCtaUrl] = useState(msg.cta_url || "");
   const [previewText, setPreviewText] = useState(msg.preview_text || "");
+  const [imageUrl, setImageUrl] = useState((msg as CampaignMessage & { image_url?: string }).image_url || "");
+  const [videoUrl, setVideoUrl] = useState((msg as CampaignMessage & { video_url?: string }).video_url || "");
   const [sendAt, setSendAt] = useState(msg.send_at ? msg.send_at.slice(0, 16) : "");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -1207,7 +1224,13 @@ function EditMessage({
   }
 
   function handleSave() {
-    onSave({ subject, body, cta_text: ctaText, cta_url: ctaUrl || null, preview_text: previewText });
+    // Enforce: can't have both image and video
+    const finalImageUrl = imageUrl && !videoUrl ? imageUrl : imageUrl && videoUrl ? imageUrl : imageUrl || null;
+    const finalVideoUrl = videoUrl && !imageUrl ? videoUrl : null;
+    onSave({
+      subject, body, cta_text: ctaText, cta_url: ctaUrl || null, preview_text: previewText,
+      image_url: finalImageUrl, video_url: finalVideoUrl,
+    } as Partial<CampaignMessage>);
     if (sendAt) onSchedule(new Date(sendAt).toISOString());
   }
 
@@ -1259,6 +1282,24 @@ function EditMessage({
             className="w-full bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
         </div>
       )}
+
+      {/* Media URLs — image OR video, not both */}
+      <div className="space-y-2">
+        <label className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide">Media (one per post)</label>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <input type="url" value={imageUrl} onChange={(e) => { setImageUrl(e.target.value); if (e.target.value) setVideoUrl(""); }} placeholder="Image URL"
+              className="w-full bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
+            {imageUrl && <p className="text-[10px] text-green-400 mt-1">Image attached</p>}
+          </div>
+          <div>
+            <input type="url" value={videoUrl} onChange={(e) => { setVideoUrl(e.target.value); if (e.target.value) setImageUrl(""); }} placeholder="Video URL"
+              className="w-full bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
+            {videoUrl && <p className="text-[10px] text-blue-400 mt-1">Video attached</p>}
+          </div>
+        </div>
+        {imageUrl && videoUrl && <p className="text-[10px] text-red-400">Only one media type allowed — clear one.</p>}
+      </div>
 
       <div className="flex items-center gap-3">
         <label className="text-xs text-[var(--muted)]">Schedule ({tzLabel}):</label>
