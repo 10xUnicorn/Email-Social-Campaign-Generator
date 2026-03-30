@@ -95,6 +95,15 @@ export default function CampaignDetail() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [savingCampaign, setSavingCampaign] = useState(false);
 
+  // Media assets state
+  const [showMediaPanel, setShowMediaPanel] = useState(false);
+  const [mediaAssets, setMediaAssets] = useState<{ url: string; type: "image" | "video"; description: string }[]>([]);
+  const [newMediaUrl, setNewMediaUrl] = useState("");
+  const [newMediaType, setNewMediaType] = useState<"image" | "video">("image");
+  const [newMediaDesc, setNewMediaDesc] = useState("");
+  const [bulkMediaText, setBulkMediaText] = useState("");
+  const [autoPopulating, setAutoPopulating] = useState(false);
+
   // Regenerate state
   const [regenerating, setRegenerating] = useState(false);
   const [regenProgress, setRegenProgress] = useState("");
@@ -357,6 +366,70 @@ export default function CampaignDetail() {
       console.error("Auto-schedule error:", err);
     }
     setAutoScheduling(false);
+  }
+
+  // ── Auto-Populate Media to Posts ──
+  async function handleAutoPopulateMedia() {
+    if (!campaign || mediaAssets.length === 0 || messages.length === 0) return;
+    setAutoPopulating(true);
+
+    try {
+      const res = await fetch("/api/auto-match-media", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          campaign_id: campaign.id,
+          media_assets: mediaAssets,
+          messages: messages.map((m) => ({ id: m.id, subject: m.subject, body: m.body.slice(0, 300), channel: m.channel })),
+        }),
+      });
+
+      if (!res.ok) throw new Error("Auto-match failed");
+      const data = await res.json();
+
+      if (data.assignments) {
+        // Update local state
+        setMessages((prev) =>
+          prev.map((m) => {
+            const assignment = data.assignments.find((a: { message_id: string }) => a.message_id === m.id);
+            if (assignment) {
+              return { ...m, image_url: assignment.image_url || null, video_url: assignment.video_url || null };
+            }
+            return m;
+          })
+        );
+      }
+    } catch (err) {
+      console.error("Auto-populate error:", err);
+      alert("Failed to auto-populate media. Try again.");
+    }
+    setAutoPopulating(false);
+  }
+
+  function addMediaAsset() {
+    if (!newMediaUrl.trim()) return;
+    setMediaAssets((prev) => [...prev, { url: newMediaUrl.trim(), type: newMediaType, description: newMediaDesc.trim() }]);
+    setNewMediaUrl("");
+    setNewMediaDesc("");
+  }
+
+  function parseBulkMedia() {
+    if (!bulkMediaText.trim()) return;
+    const lines = bulkMediaText.trim().split("\n").filter(Boolean);
+    const newAssets: { url: string; type: "image" | "video"; description: string }[] = [];
+    for (const line of lines) {
+      // Format: URL | type | description  OR  just URL
+      const parts = line.split("|").map((p) => p.trim());
+      const url = parts[0];
+      if (!url || (!url.startsWith("http://") && !url.startsWith("https://"))) continue;
+      const type: "image" | "video" = parts[1]?.toLowerCase() === "video" ? "video" : "image";
+      const description = parts[2] || parts[1]?.toLowerCase() !== "video" && parts[1]?.toLowerCase() !== "image" ? parts[1] || "" : "";
+      newAssets.push({ url, type, description: typeof description === "string" ? description : "" });
+    }
+    if (newAssets.length > 0) {
+      setMediaAssets((prev) => [...prev, ...newAssets]);
+      setBulkMediaText("");
+    }
   }
 
   // ── Generate HTML Email Template ──
@@ -642,6 +715,9 @@ export default function CampaignDetail() {
           <button onClick={() => { setShowScheduleConfig(true); setScheduleStartDate(new Date().toISOString().split("T")[0]); }} className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm transition-colors" title={`${unscheduledCount} unscheduled`}>
             Auto-Schedule {unscheduledCount > 0 && `(${unscheduledCount})`}
           </button>
+          <button onClick={() => setShowMediaPanel(!showMediaPanel)} className="px-4 py-2 rounded-lg text-sm font-medium transition-colors" style={{background: "linear-gradient(135deg, #059669, #0891b2)", color: "#fff"}}>
+            Media Assets {mediaAssets.length > 0 && `(${mediaAssets.length})`}
+          </button>
           <button onClick={() => setShowExport(true)} className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Export</button>
           <button onClick={() => setShowPublish(true)} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Publish</button>
           <button onClick={() => { setDupChannels(uniqueChannels); setShowDupModal(true); }} className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm transition-colors">Duplicate</button>
@@ -855,6 +931,81 @@ export default function CampaignDetail() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Media Assets Panel */}
+      {showMediaPanel && (
+        <div className="bg-[var(--card)] border border-[var(--card-border)] rounded-xl p-5 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold">Media Assets</h3>
+            <button onClick={() => setShowMediaPanel(false)} className="text-[var(--muted)] hover:text-white text-lg">&times;</button>
+          </div>
+
+          <p className="text-xs text-[var(--muted)] mb-4">
+            Add your image and video URLs with descriptions. Then hit <strong>Auto-Populate</strong> to have AI match each asset to the most relevant post.
+          </p>
+
+          {/* Single add row */}
+          <div className="flex gap-2 mb-3 flex-wrap">
+            <input value={newMediaUrl} onChange={(e) => setNewMediaUrl(e.target.value)} placeholder="https://... media URL"
+              className="flex-1 min-w-[200px] bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" />
+            <select value={newMediaType} onChange={(e) => setNewMediaType(e.target.value as "image" | "video")}
+              className="bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]">
+              <option value="image">Image</option>
+              <option value="video">Video</option>
+            </select>
+            <input value={newMediaDesc} onChange={(e) => setNewMediaDesc(e.target.value)} placeholder="Description of this media..."
+              className="flex-1 min-w-[180px] bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+              onKeyDown={(e) => { if (e.key === "Enter") addMediaAsset(); }} />
+            <button onClick={addMediaAsset} className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+              Add
+            </button>
+          </div>
+
+          {/* Bulk paste */}
+          <details className="mb-4">
+            <summary className="text-xs text-[var(--accent)] cursor-pointer hover:underline">Bulk paste (one per line)</summary>
+            <div className="mt-2">
+              <textarea value={bulkMediaText} onChange={(e) => setBulkMediaText(e.target.value)} rows={4} placeholder={"https://example.com/image1.jpg | image | Hero shot of product\nhttps://example.com/video1.mp4 | video | Customer testimonial\nhttps://example.com/img2.png"}
+                className="w-full bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:border-[var(--accent)] resize-none" />
+              <p className="text-[10px] text-[var(--muted)] mt-1 mb-2">Format: URL | type | description (type and description optional)</p>
+              <button onClick={parseBulkMedia} className="bg-white/10 hover:bg-white/15 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+                Parse & Add
+              </button>
+            </div>
+          </details>
+
+          {/* Asset list */}
+          {mediaAssets.length > 0 && (
+            <div className="space-y-2 mb-4 max-h-[240px] overflow-y-auto">
+              {mediaAssets.map((asset, idx) => (
+                <div key={idx} className="flex items-center gap-3 bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${asset.type === "video" ? "bg-blue-500/15 text-blue-400" : "bg-green-500/15 text-green-400"}`}>
+                    {asset.type === "video" ? "VID" : "IMG"}
+                  </span>
+                  <a href={asset.url} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--accent)] hover:underline truncate max-w-[200px]">{asset.url}</a>
+                  <span className="text-xs text-[var(--muted)] flex-1 truncate">{asset.description || "No description"}</span>
+                  <button onClick={() => setMediaAssets((prev) => prev.filter((_, i) => i !== idx))} className="text-red-400 hover:text-red-300 text-xs">Remove</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex gap-3 items-center">
+            <button onClick={handleAutoPopulateMedia} disabled={autoPopulating || mediaAssets.length === 0 || messages.length === 0}
+              className="text-white px-5 py-2.5 rounded-lg text-sm font-bold transition-all disabled:opacity-40"
+              style={{background: autoPopulating ? "#555" : "linear-gradient(135deg, #7c3aed, #db2777)"}}>
+              {autoPopulating ? "Matching..." : `Auto-Populate ${messages.length} Posts`}
+            </button>
+            {mediaAssets.length > 0 && (
+              <button onClick={() => setMediaAssets([])} className="text-xs text-red-400 hover:text-red-300">Clear All</button>
+            )}
+            <span className="text-[10px] text-[var(--muted)] ml-auto">
+              {mediaAssets.filter((a) => a.type === "image").length} images, {mediaAssets.filter((a) => a.type === "video").length} videos
+            </span>
           </div>
         </div>
       )}
