@@ -95,9 +95,17 @@ export default function CampaignDetail() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [savingCampaign, setSavingCampaign] = useState(false);
 
+  // Calendar preview state
+  const [calendarCollapsed, setCalendarCollapsed] = useState(false);
+  const [calendarFilter, setCalendarFilter] = useState<string>("all");
+  const [calHoverId, setCalHoverId] = useState<string | null>(null);
+  const [calEditId, setCalEditId] = useState<string | null>(null);
+  const [calEditBody, setCalEditBody] = useState("");
+  const [calEditDate, setCalEditDate] = useState("");
+  const calHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Media assets state
   const [showMediaPanel, setShowMediaPanel] = useState(false);
-  const [calendarCollapsed, setCalendarCollapsed] = useState(false);
   const [mediaAssets, setMediaAssets] = useState<{ url: string; type: "image" | "video"; description: string }[]>([]);
   const [newMediaUrl, setNewMediaUrl] = useState("");
   const [newMediaType, setNewMediaType] = useState<"image" | "video">("image");
@@ -716,7 +724,20 @@ export default function CampaignDetail() {
           <button onClick={() => { setShowScheduleConfig(true); setScheduleStartDate(new Date().toISOString().split("T")[0]); }} className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm transition-colors" title={`${unscheduledCount} unscheduled`}>
             Auto-Schedule {unscheduledCount > 0 && `(${unscheduledCount})`}
           </button>
-          <button onClick={() => setShowMediaPanel(!showMediaPanel)} className="px-4 py-2 rounded-lg text-sm font-medium transition-colors" style={{background: "linear-gradient(135deg, #059669, #0891b2)", color: "#fff"}}>
+          <button onClick={() => {
+            // When opening, seed media assets from campaign image files
+            if (!showMediaPanel && files.length > 0) {
+              const imageFiles = files.filter((f) => f.file_type === "image");
+              const existingUrls = new Set(mediaAssets.map((a) => a.url));
+              const newFromFiles = imageFiles.filter((f) => !existingUrls.has(f.file_url)).map((f) => ({
+                url: f.file_url,
+                type: "image" as const,
+                description: f.file_name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "),
+              }));
+              if (newFromFiles.length > 0) setMediaAssets((prev) => [...prev, ...newFromFiles]);
+            }
+            setShowMediaPanel(!showMediaPanel);
+          }} className="px-4 py-2 rounded-lg text-sm font-medium transition-colors" style={{background: "linear-gradient(135deg, #059669, #0891b2)", color: "#fff"}}>
             Media Assets {mediaAssets.length > 0 && `(${mediaAssets.length})`}
           </button>
           <button onClick={() => setShowExport(true)} className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Export</button>
@@ -1102,8 +1123,12 @@ export default function CampaignDetail() {
 
       {/* Schedule Preview */}
       {(() => {
-        const scheduled = messages.filter((m) => m.send_at).sort((a, b) => new Date(a.send_at!).getTime() - new Date(b.send_at!).getTime());
-        if (scheduled.length === 0) return null;
+        const allScheduled = messages.filter((m) => m.send_at).sort((a, b) => new Date(a.send_at!).getTime() - new Date(b.send_at!).getTime());
+        if (allScheduled.length === 0) return null;
+
+        const scheduled = calendarFilter === "all" ? allScheduled : allScheduled.filter((m) => m.channel === calendarFilter);
+        const calChannelCounts: Record<string, number> = {};
+        for (const m of allScheduled) calChannelCounts[m.channel] = (calChannelCounts[m.channel] || 0) + 1;
 
         // Group by date in campaign timezone
         const tz = campaign?.timezone || "America/New_York";
@@ -1114,8 +1139,39 @@ export default function CampaignDetail() {
           byDate[dateKey].push(msg);
         }
 
+        function scrollToMessage(id: string) {
+          const el = document.getElementById(`msg-${id}`);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            el.classList.add("ring-2", "ring-[var(--accent)]");
+            setTimeout(() => el.classList.remove("ring-2", "ring-[var(--accent)]"), 2000);
+          }
+        }
+
+        function startCalEdit(msg: CampaignMessage) {
+          setCalEditId(msg.id);
+          setCalEditBody(msg.body);
+          setCalEditDate(msg.send_at ? msg.send_at.slice(0, 16) : "");
+        }
+
+        async function saveCalEdit(msgId: string) {
+          const updates: Partial<CampaignMessage> = {};
+          const orig = messages.find((m) => m.id === msgId);
+          if (!orig) return;
+          if (calEditBody !== orig.body) updates.body = calEditBody;
+          if (calEditDate) {
+            const newIso = new Date(calEditDate).toISOString();
+            if (newIso !== orig.send_at) updates.send_at = newIso;
+          }
+          if (Object.keys(updates).length > 0) {
+            await updateMessage(msgId, updates);
+          }
+          setCalEditId(null);
+        }
+
         return (
           <div className="bg-[var(--card)] border border-[var(--card-border)] rounded-xl p-5 mb-6">
+            {/* Header row — click to collapse */}
             <div
               className="flex items-center justify-between cursor-pointer"
               onClick={() => setCalendarCollapsed(!calendarCollapsed)}
@@ -1125,49 +1181,146 @@ export default function CampaignDetail() {
                 <h3 className="text-sm font-semibold">Content Calendar Preview</h3>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-xs text-[var(--muted)]">{scheduled.length} scheduled • {tzLabel}</span>
+                <span className="text-xs text-[var(--muted)]">{allScheduled.length} scheduled • {tzLabel}</span>
                 <a href="/calendar" className="text-xs text-[var(--accent)] hover:underline" onClick={(e) => e.stopPropagation()}>Full Calendar →</a>
               </div>
             </div>
-            {!calendarCollapsed && <div className="space-y-3 mt-4">
-              {Object.entries(byDate).map(([dateLabel, dayMsgs]) => (
-                <div key={dateLabel}>
-                  <p className="text-xs font-semibold text-[var(--muted)] mb-1.5 uppercase tracking-wide">{dateLabel}</p>
-                  <div className="space-y-1.5 ml-2 border-l-2 border-[var(--card-border)] pl-3">
-                    {dayMsgs.map((msg) => (
-                      <div key={msg.id} className="flex items-start gap-3 group">
-                        <span className={`flex-shrink-0 w-2 h-2 rounded-full mt-1.5 ${
-                          msg.channel === "email" ? "bg-blue-400" : msg.channel === "sms" ? "bg-green-400" : "bg-purple-400"
-                        }`} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold">
-                              {formatTimeOnlyTz(msg.send_at!)}
-                            </span>
-                            <span className={`text-xs px-1.5 py-0.5 rounded font-medium uppercase ${channelColors[msg.channel]}`}>
-                              {msg.channel}
-                            </span>
-                            {campaign?.company && (
-                              <span className="text-xs text-[var(--accent)]">{campaign.company.name}</span>
-                            )}
-                          </div>
-                          <p className="text-xs text-[var(--fg)]/70 truncate mt-0.5">
-                            {msg.channel === "email" && msg.subject ? msg.subject : msg.body.slice(0, 80) + (msg.body.length > 80 ? "…" : "")}
-                          </p>
+
+            {!calendarCollapsed && <>
+              {/* Channel quick filters */}
+              <div className="flex gap-1.5 mt-3 mb-4" onClick={(e) => e.stopPropagation()}>
+                <button onClick={() => setCalendarFilter("all")} className={`text-[10px] px-2.5 py-1 rounded-full font-medium transition-colors ${calendarFilter === "all" ? "bg-[var(--accent)] text-white" : "bg-white/5 hover:bg-white/10 text-[var(--muted)]"}`}>
+                  All ({allScheduled.length})
+                </button>
+                {Object.entries(calChannelCounts).map(([ch, count]) => (
+                  <button key={ch} onClick={() => setCalendarFilter(ch)} className={`text-[10px] px-2.5 py-1 rounded-full font-medium transition-colors ${calendarFilter === ch ? "bg-[var(--accent)] text-white" : "bg-white/5 hover:bg-white/10 text-[var(--muted)]"}`}>
+                    {ch === "email" ? "Email" : ch === "sms" ? "SMS" : "Social"} ({count})
+                  </button>
+                ))}
+              </div>
+
+              {/* Calendar items */}
+              <div className="space-y-3">
+                {Object.entries(byDate).map(([dateLabel, dayMsgs]) => (
+                  <div key={dateLabel}>
+                    <p className="text-xs font-semibold text-[var(--muted)] mb-1.5 uppercase tracking-wide">{dateLabel}</p>
+                    <div className="space-y-1.5 ml-2 border-l-2 border-[var(--card-border)] pl-3">
+                      {dayMsgs.map((msg) => (
+                        <div key={msg.id} className="relative">
+                          {/* Inline quick edit */}
+                          {calEditId === msg.id ? (
+                            <div className="bg-white/5 border border-[var(--accent)]/30 rounded-lg p-3 space-y-2">
+                              <textarea
+                                value={calEditBody}
+                                onChange={(e) => setCalEditBody(e.target.value)}
+                                rows={3}
+                                className="w-full bg-[var(--bg)] border border-[var(--card-border)] rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-[var(--accent)] resize-y"
+                              />
+                              <div className="flex items-center gap-2">
+                                <label className="text-[10px] text-[var(--muted)]">Date/Time:</label>
+                                <input
+                                  type="datetime-local"
+                                  value={calEditDate}
+                                  onChange={(e) => setCalEditDate(e.target.value)}
+                                  className="bg-[var(--bg)] border border-[var(--card-border)] rounded px-2 py-1 text-xs focus:outline-none focus:border-[var(--accent)]"
+                                />
+                                <div className="flex-1" />
+                                <button onClick={() => setCalEditId(null)} className="text-[10px] px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-[var(--muted)] transition-colors">Cancel</button>
+                                <button onClick={() => saveCalEdit(msg.id)} className="text-[10px] px-2.5 py-1 rounded bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-medium transition-colors">Save</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div
+                              className="flex items-start gap-3 group cursor-pointer rounded-lg px-2 py-1.5 -mx-2 hover:bg-white/5 transition-colors"
+                              onMouseEnter={() => {
+                                if (calHoverTimer.current) clearTimeout(calHoverTimer.current);
+                                calHoverTimer.current = setTimeout(() => setCalHoverId(msg.id), 300);
+                              }}
+                              onMouseLeave={() => {
+                                if (calHoverTimer.current) clearTimeout(calHoverTimer.current);
+                                calHoverTimer.current = setTimeout(() => setCalHoverId(null), 200);
+                              }}
+                              onClick={() => scrollToMessage(msg.id)}
+                            >
+                              <span className={`flex-shrink-0 w-2 h-2 rounded-full mt-1.5 ${
+                                msg.channel === "email" ? "bg-blue-400" : msg.channel === "sms" ? "bg-green-400" : "bg-purple-400"
+                              }`} />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-semibold">{formatTimeOnlyTz(msg.send_at!)}</span>
+                                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium uppercase ${channelColors[msg.channel]}`}>{msg.channel}</span>
+                                  {(msg.image_url || msg.video_url) && (
+                                    <span className={`text-[9px] px-1 py-0.5 rounded ${msg.image_url ? "bg-green-500/15 text-green-400" : "bg-blue-500/15 text-blue-400"}`}>
+                                      {msg.image_url ? "IMG" : "VID"}
+                                    </span>
+                                  )}
+                                  {campaign?.company && <span className="text-xs text-[var(--accent)]">{campaign.company.name}</span>}
+                                </div>
+                                <p className="text-xs text-[var(--fg)]/70 truncate mt-0.5">
+                                  {msg.channel === "email" && msg.subject ? msg.subject : msg.body.slice(0, 80) + (msg.body.length > 80 ? "…" : "")}
+                                </p>
+                              </div>
+                              {/* Quick action buttons (visible on hover) */}
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); startCalEdit(msg); }}
+                                  className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[var(--muted)] hover:text-white transition-colors"
+                                  title="Quick edit"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); scheduleMessage(msg.id, ""); }}
+                                  className="text-[10px] text-red-400 px-1 py-0.5 hover:bg-red-500/10 rounded transition-colors"
+                                  title="Remove schedule"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Hover preview popup */}
+                          {calHoverId === msg.id && calEditId !== msg.id && (
+                            <div
+                              className="absolute left-full ml-3 top-0 z-50 w-80 bg-[#1e1e2e] border border-[var(--card-border)] rounded-xl shadow-2xl p-4 pointer-events-none"
+                              style={{ maxHeight: 340, overflow: "hidden" }}
+                            >
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className={`text-xs px-1.5 py-0.5 rounded font-medium uppercase ${channelColors[msg.channel]}`}>{msg.channel}</span>
+                                <span className="text-xs text-[var(--muted)]">#{msg.sequence_order}</span>
+                                {msg.status && <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-[var(--muted)]">{msg.status}</span>}
+                              </div>
+                              {msg.subject && <p className="text-xs font-semibold mb-1.5 text-[var(--fg)]">{msg.subject}</p>}
+                              <div className="text-xs text-[var(--fg)]/70 whitespace-pre-wrap leading-relaxed" style={{ maxHeight: 160, overflow: "hidden", maskImage: "linear-gradient(to bottom, black 80%, transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black 80%, transparent 100%)" }}>
+                                {msg.body.slice(0, 500)}
+                              </div>
+                              {/* Media preview */}
+                              {msg.image_url && (
+                                <div className="mt-2 rounded-lg overflow-hidden border border-[var(--card-border)]">
+                                  <img src={msg.image_url} alt="Post media" className="w-full h-24 object-cover" />
+                                </div>
+                              )}
+                              {msg.video_url && (
+                                <div className="mt-2 flex items-center gap-2 bg-blue-500/10 rounded-lg px-2.5 py-1.5 border border-blue-500/20">
+                                  <span className="text-blue-400 text-sm">▶</span>
+                                  <span className="text-[10px] text-blue-400 truncate">{msg.video_url}</span>
+                                </div>
+                              )}
+                              {msg.cta_text && <p className="text-[10px] text-[var(--accent)] mt-2">CTA: {msg.cta_text}</p>}
+                              <p className="text-[10px] text-[var(--muted)] mt-1.5">Click to jump to post →</p>
+                            </div>
+                          )}
                         </div>
-                        <button
-                          onClick={() => scheduleMessage(msg.id, "")}
-                          className="text-xs text-red-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                          title="Remove schedule"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>}
+                ))}
+                {scheduled.length === 0 && (
+                  <p className="text-xs text-[var(--muted)] italic">No {calendarFilter} posts scheduled.</p>
+                )}
+              </div>
+            </>}
           </div>
         );
       })()}
@@ -1187,7 +1340,7 @@ export default function CampaignDetail() {
       {/* Messages */}
       <div className="space-y-4">
         {filteredMessages.map((msg) => (
-          <div key={msg.id} className="bg-[var(--card)] border border-[var(--card-border)] rounded-xl p-6 relative">
+          <div key={msg.id} id={`msg-${msg.id}`} className="bg-[var(--card)] border border-[var(--card-border)] rounded-xl p-6 relative transition-all duration-300">
             {/* Header row */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
