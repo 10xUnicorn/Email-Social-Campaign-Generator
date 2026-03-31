@@ -1,22 +1,26 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #0a0a0a;
-  --fg: #ededed;
+  --bg: #ffffff;
+  --bg-secondary: #f9fafb;
+  --fg: #1e1b4b;
+  --fg-secondary: #374151;
   --accent: #7c3aed;
   --accent-hover: #6d28d9;
-  --card: #141414;
-  --card-border: #262626;
-  --muted: #737373;
+  --accent-light: #f5f3ff;
+  --card: #ffffff;
+  --card-border: #e5e7eb;
+  --muted: #6b7280;
   --success: #22c55e;
   --warning: #f59e0b;
   --danger: #ef4444;
+  --sidebar-width: 260px;
 }
 
 body {
-  background: var(--bg);
-  color: var(--fg);
-  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg-secondary);
+  color: var(--fg-secondary);
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
 }
 
 @keyframes fadeIn {
@@ -29,4 +33,48 @@ body {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Sidebar active link */
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--fg-secondary);
+  transition: all 0.15s ease;
+}
+.sidebar-link:hover {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+.sidebar-link.active {
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Purple gradient button */
+.btn-primary {
+  background: var(--accent);
+  color: white;
+  font-weight: 500;
+  padding: 0.625rem 1.25rem;
+  border-radius: 0.75rem;
+  transition: background 0.15s ease;
+  font-size: 0.875rem;
+}
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+/* Card style */
+.cl-card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 }
