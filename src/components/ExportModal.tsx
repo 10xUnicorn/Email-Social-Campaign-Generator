@@ -60,18 +60,33 @@ export default function ExportModal({
   ];
   const [dateFormat, setDateFormat] = useState("YYYY-MM-DD HH:mm:ss");
 
-  // Reorder helpers
-  const moveFieldUp = (idx: number) => {
-    if (idx <= 0) return;
-    const updated = [...mappings];
-    [updated[idx - 1], updated[idx]] = [updated[idx], updated[idx - 1]];
-    setMappings(updated);
+  // Drag-and-drop reorder state
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+
+  const handleDragStart = (idx: number) => {
+    setDragIdx(idx);
   };
-  const moveFieldDown = (idx: number) => {
-    if (idx >= mappings.length - 1) return;
+  const handleDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    setDragOverIdx(idx);
+  };
+  const handleDrop = (idx: number) => {
+    if (dragIdx === null || dragIdx === idx) {
+      setDragIdx(null);
+      setDragOverIdx(null);
+      return;
+    }
     const updated = [...mappings];
-    [updated[idx], updated[idx + 1]] = [updated[idx + 1], updated[idx]];
+    const [moved] = updated.splice(dragIdx, 1);
+    updated.splice(idx, 0, moved);
     setMappings(updated);
+    setDragIdx(null);
+    setDragOverIdx(null);
+  };
+  const handleDragEnd = () => {
+    setDragIdx(null);
+    setDragOverIdx(null);
   };
 
   // Manual header add
@@ -112,14 +127,16 @@ export default function ExportModal({
     setSelectedProfileId(profileId);
     const profile = profiles.find((p) => p.id === profileId);
     if (profile) {
-      // Merge profile mappings with full field list (in case new fields were added)
-      const merged = EXPORTABLE_FIELDS.map((f) => {
-        const existing = profile.field_mappings.find(
-          (m: FieldMapping) => m.field === f.field
-        );
-        return existing || { ...f, enabled: false };
+      // Load in saved order, then append any new fields not in the profile
+      const savedFields = new Set(profile.field_mappings.map((m: FieldMapping) => m.field));
+      const fromProfile = profile.field_mappings.map((m: FieldMapping) => {
+        const meta = EXPORTABLE_FIELDS.find((f) => f.field === m.field);
+        return meta ? { ...meta, ...m } : m;
       });
-      setMappings(merged);
+      const newFields = EXPORTABLE_FIELDS
+        .filter((f) => !savedFields.has(f.field))
+        .map((f) => ({ ...f, enabled: false }));
+      setMappings([...fromProfile, ...newFields]);
     }
   };
 
@@ -585,7 +602,7 @@ export default function ExportModal({
               </div>
             )}
 
-            {/* Field mapping table */}
+            {/* Field mapping table — drag to reorder */}
             <div
               style={{
                 border: "1px solid #444",
@@ -598,9 +615,7 @@ export default function ExportModal({
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ background: "#2a2a3c" }}>
-                    <th style={{ padding: "8px 6px", textAlign: "center", color: "#888", fontSize: 11, fontWeight: 600, width: 50 }}>
-                      Order
-                    </th>
+                    <th style={{ padding: "8px 6px", textAlign: "center", color: "#888", fontSize: 11, fontWeight: 600, width: 36 }}></th>
                     <th style={{ padding: "8px 10px", textAlign: "left", color: "#888", fontSize: 11, fontWeight: 600, width: 40 }}>
                       ON
                     </th>
@@ -615,39 +630,33 @@ export default function ExportModal({
                 <tbody>
                   {mappings.map((m, idx) => {
                     const fieldMeta = EXPORTABLE_FIELDS.find((f) => f.field === m.field);
+                    const isDragging = dragIdx === idx;
+                    const isDragOver = dragOverIdx === idx && dragIdx !== idx;
                     return (
                       <tr
                         key={m.field}
+                        draggable
+                        onDragStart={() => handleDragStart(idx)}
+                        onDragOver={(e) => handleDragOver(e, idx)}
+                        onDrop={() => handleDrop(idx)}
+                        onDragEnd={handleDragEnd}
                         style={{
-                          borderTop: "1px solid #333",
-                          opacity: m.enabled ? 1 : 0.4,
+                          borderTop: isDragOver ? "2px solid #8b5cf6" : "1px solid #333",
+                          opacity: isDragging ? 0.4 : m.enabled ? 1 : 0.4,
+                          cursor: "grab",
+                          background: isDragOver ? "rgba(139,92,246,0.08)" : "transparent",
+                          transition: "border-top 0.1s, background 0.1s",
                         }}
                       >
-                        <td style={{ padding: "4px 6px", textAlign: "center" }}>
-                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
-                            <button
-                              onClick={() => moveFieldUp(idx)}
-                              disabled={idx === 0}
-                              style={{ background: "none", border: "none", color: idx === 0 ? "#333" : "#888", cursor: idx === 0 ? "default" : "pointer", fontSize: 11, lineHeight: 1, padding: "1px 4px" }}
-                              title="Move up"
-                            >
-                              ▲
-                            </button>
-                            <button
-                              onClick={() => moveFieldDown(idx)}
-                              disabled={idx === mappings.length - 1}
-                              style={{ background: "none", border: "none", color: idx === mappings.length - 1 ? "#333" : "#888", cursor: idx === mappings.length - 1 ? "default" : "pointer", fontSize: 11, lineHeight: 1, padding: "1px 4px" }}
-                              title="Move down"
-                            >
-                              ▼
-                            </button>
-                          </div>
+                        <td style={{ padding: "6px 6px", textAlign: "center", color: "#555", fontSize: 14, cursor: "grab", userSelect: "none" }} title="Drag to reorder">
+                          ⠿
                         </td>
                         <td style={{ padding: "6px 10px" }}>
                           <input
                             type="checkbox"
                             checked={m.enabled}
                             onChange={() => toggleField(idx)}
+                            onClick={(e) => e.stopPropagation()}
                             style={{ cursor: "pointer" }}
                           />
                         </td>
@@ -659,6 +668,7 @@ export default function ExportModal({
                           <input
                             value={m.header}
                             onChange={(e) => updateHeader(idx, e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
                             style={{
                               width: "100%",
                               padding: "5px 8px",
@@ -736,7 +746,7 @@ export default function ExportModal({
 
             {/* Column order hint */}
             <div style={{ fontSize: 11, color: "#666", marginTop: 8 }}>
-              Use ▲▼ arrows to reorder columns. Top = first column in the export file.
+              Drag ⠿ to reorder columns. Top = first column in the export file.
             </div>
 
             {/* Date/Time format picker */}
