@@ -1,9 +1,20 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AuthProvider } from "@/lib/auth-context";
+import AppShell from "@/components/AppShell";
 
 export const metadata: Metadata = {
-  title: "Campaign Generator",
-  description: "AI-powered multi-channel campaign generator",
+  title: "Copy Launch — AI Campaign Generator",
+  description:
+    "Generate complete multi-channel marketing campaigns in minutes. Email sequences, SMS drips, social posts — aligned to your brand voice.",
+  openGraph: {
+    title: "Copy Launch — AI Campaign Generator",
+    description:
+      "Generate complete multi-channel marketing campaigns in minutes.",
+    url: "https://copylaunch.app",
+    siteName: "Copy Launch",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
@@ -13,32 +24,16 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body className="min-h-screen antialiased">
-        <nav className="border-b border-[var(--card-border)] px-6 py-4">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <a href="/" className="text-xl font-bold tracking-tight">
-              <span className="text-[var(--accent)]">Campaign</span> Generator
-            </a>
-            <div className="flex gap-6 text-sm">
-              <a href="/" className="hover:text-[var(--accent)] transition-colors">
-                Campaigns
-              </a>
-              <a href="/calendar" className="hover:text-[var(--accent)] transition-colors">
-                Calendar
-              </a>
-              <a href="/companies" className="hover:text-[var(--accent)] transition-colors">
-                Companies
-              </a>
-              <a href="/brand-voices" className="hover:text-[var(--accent)] transition-colors">
-                Brand Voices
-              </a>
-              <a href="/variables" className="hover:text-[var(--accent)] transition-colors">
-                Variables
-              </a>
-            </div>
-          </div>
-        </nav>
-        <main className="max-w-7xl mx-auto px-6 py-8">{children}</main>
+        <AuthProvider>
+          <AppShell>{children}</AppShell>
+        </AuthProvider>
       </body>
     </html>
   );
