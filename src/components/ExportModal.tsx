@@ -44,6 +44,22 @@ export default function ExportModal({
   const [uploadedHeaders, setUploadedHeaders] = useState<string[]>([]);
   const [copiedHeader, setCopiedHeader] = useState<string | null>(null);
 
+  // Date/time format for CSV export
+  const DATE_FORMATS = [
+    { value: "YYYY-MM-DD HH:mm:ss", label: "YYYY-MM-DD HH:mm:ss (Default)", example: "2026-03-30 14:30:00" },
+    { value: "MM/DD/YYYY HH:mm", label: "MM/DD/YYYY HH:mm (US)", example: "03/30/2026 14:30" },
+    { value: "DD/MM/YYYY HH:mm", label: "DD/MM/YYYY HH:mm (UK/EU)", example: "30/03/2026 14:30" },
+    { value: "YYYY-MM-DDTHH:mm:ssZ", label: "ISO 8601 (UTC)", example: "2026-03-30T14:30:00Z" },
+    { value: "MM/DD/YYYY hh:mm A", label: "MM/DD/YYYY hh:mm AM/PM", example: "03/30/2026 02:30 PM" },
+    { value: "DD MMM YYYY HH:mm", label: "DD MMM YYYY HH:mm", example: "30 Mar 2026 14:30" },
+    { value: "MMM DD, YYYY hh:mm A", label: "MMM DD, YYYY hh:mm AM/PM", example: "Mar 30, 2026 02:30 PM" },
+    { value: "YYYY/MM/DD HH:mm", label: "YYYY/MM/DD HH:mm (Japan/China)", example: "2026/03/30 14:30" },
+    { value: "Unix", label: "Unix Timestamp", example: "1774905000" },
+    { value: "date_only", label: "YYYY-MM-DD (Date Only)", example: "2026-03-30" },
+    { value: "time_only", label: "HH:mm:ss (Time Only)", example: "14:30:00" },
+  ];
+  const [dateFormat, setDateFormat] = useState("YYYY-MM-DD HH:mm:ss");
+
   // Reorder helpers
   const moveFieldUp = (idx: number) => {
     if (idx <= 0) return;
@@ -235,6 +251,7 @@ export default function ExportModal({
 
       if (format === "csv") {
         payload.field_mappings = mappings;
+        payload.date_format = dateFormat;
         const res = await fetch("/api/export-csv", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -720,6 +737,26 @@ export default function ExportModal({
             {/* Column order hint */}
             <div style={{ fontSize: 11, color: "#666", marginTop: 8 }}>
               Use ▲▼ arrows to reorder columns. Top = first column in the export file.
+            </div>
+
+            {/* Date/Time format picker */}
+            <div style={{ marginTop: 14, background: "#2a2a3c", borderRadius: 8, padding: 12, border: "1px solid #444" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <label style={{ fontSize: 11, color: "#888", whiteSpace: "nowrap", fontWeight: 600 }}>Date/Time Format:</label>
+                <select
+                  value={dateFormat}
+                  onChange={(e) => setDateFormat(e.target.value)}
+                  style={{ flex: 1, minWidth: 220, padding: "7px 10px", borderRadius: 6, border: "1px solid #555", background: "#1e1e2e", color: "#ddd", fontSize: 12 }}
+                >
+                  {DATE_FORMATS.map((f) => (
+                    <option key={f.value} value={f.value}>{f.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: "#666" }}>
+                Preview: <span style={{ color: "#a78bfa", fontFamily: "monospace" }}>{DATE_FORMATS.find((f) => f.value === dateFormat)?.example}</span>
+                {" "}— applies to Send Date, Created At, Updated At columns
+              </div>
             </div>
           </div>
         )}
